@@ -68,7 +68,8 @@ create table mst_ledger
  bank_swift nvarchar(64) not null default '',
  bank_name nvarchar(64) not null default '',
  bank_branch nvarchar(64) not null default '',
- bill_credit_period int not null default 0
+ bill_credit_period int not null default 0,
+ maintain_billwise tinyint
 );
 
 create table mst_vouchertype
@@ -114,6 +115,15 @@ create table mst_stock_group
  _parent varchar(64) not null default ''
 );
 
+create table mst_stock_category
+(
+ guid varchar(64) not null primary key,
+ alterid int not null default 0,
+ name nvarchar(1024) not null default '',
+ parent nvarchar(1024) not null default '',
+ _parent varchar(64) not null default ''
+);
+
 create table mst_stock_item
 (
  guid varchar(64) not null primary key,
@@ -121,6 +131,8 @@ create table mst_stock_item
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
+ stock_category nvarchar(1024) not null default '',
+ _stock_category varchar(64) not null default '',
  alias nvarchar(256) not null default '',
  description nvarchar(64) not null default '',
  notes nvarchar(64) not null default '',
@@ -141,7 +153,9 @@ create table mst_stock_item
  gst_hsn_code nvarchar(64) default '',
  gst_hsn_description nvarchar(256) default '',
  gst_rate decimal(9,4) default 0,
- gst_taxability nvarchar(32) default ''
+ gst_taxability nvarchar(32) default '',
+ is_batchwise_on tinyint,
+ is_serial_no_on tinyint
 );
 
 create table mst_cost_category
@@ -288,6 +302,7 @@ create table trn_voucher
 (
  guid varchar(64) not null primary key,
  alterid int not null default 0,
+ voucher_key int not null default 0,
  date date not null,
  voucher_type nvarchar(1024) not null,
  _voucher_type varchar(64) not null default '',
@@ -307,9 +322,11 @@ create table trn_voucher
 create table trn_accounting
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  amount decimal(17,2) not null default 0,
+ is_debit tinyint,
  amount_forex decimal(17,2) not null default 0,
  currency nvarchar(16) not null default ''
 );
@@ -317,13 +334,18 @@ create table trn_accounting
 create table trn_inventory
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  item nvarchar(1024) not null default '',
  _item varchar(64) not null default '',
  quantity decimal(15,4) not null default 0,
+ billed_quantity decimal(15,4) not null default 0,
+ unit nvarchar(32) not null default '',
  rate decimal(15,4) not null default 0,
+ gross_rate decimal(15,4) not null default 0,
  amount decimal(17,2) not null default 0,
  additional_amount decimal(17,2) not null default 0,
  discount_amount decimal(17,2) not null default 0,
+ discount_percent decimal(15,4) not null default 0,
  godown nvarchar(1024),
  _godown varchar(64) not null default '',
  tracking_number nvarchar(256),
@@ -334,6 +356,7 @@ create table trn_inventory
 create table trn_cost_centre
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  costcentre nvarchar(1024) not null default '',
@@ -344,6 +367,7 @@ create table trn_cost_centre
 create table trn_cost_category_centre
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  costcategory nvarchar(1024) not null default '',
@@ -356,6 +380,7 @@ create table trn_cost_category_centre
 create table trn_cost_inventory_category_centre
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  item nvarchar(1024) not null default '',
@@ -370,17 +395,21 @@ create table trn_cost_inventory_category_centre
 create table trn_bill
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  name nvarchar(1024) not null default '',
  amount decimal(17,2) not null default 0,
  billtype nvarchar(256) not null default '',
- bill_credit_period int not null default 0
+ bill_credit_period int not null default 0,
+ due_date date,
+ is_advance tinyint
 );
 
 create table trn_bank
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  transaction_type nvarchar(32) not null default '',
@@ -394,6 +423,7 @@ create table trn_bank
 create table trn_batch
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  item nvarchar(1024) not null default '',
  _item varchar(64) not null default '',
  name nvarchar(1024) not null default '',
@@ -409,6 +439,7 @@ create table trn_batch
 create table trn_inventory_accounting
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  ledger nvarchar(1024) not null default '',
  _ledger varchar(64) not null default '',
  amount decimal(17,2) not null default 0,
@@ -418,6 +449,7 @@ create table trn_inventory_accounting
 create table trn_employee
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  category nvarchar(1024) not null default '',
  _category varchar(64) not null default '',
  employee_name nvarchar(1024) not null default '',
@@ -429,6 +461,7 @@ create table trn_employee
 create table trn_payhead
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  category nvarchar(1024) not null default '',
  _category varchar(64) not null default '',
  employee_name nvarchar(1024) not null default '',
@@ -443,6 +476,7 @@ create table trn_payhead
 create table trn_attendance
 (
  guid varchar(64) not null default '',
+ voucher_key int not null default 0,
  employee_name nvarchar(1024) not null default '',
  _employee_name varchar(64) not null default '',
  attendancetype_name nvarchar(1024) not null default '',
