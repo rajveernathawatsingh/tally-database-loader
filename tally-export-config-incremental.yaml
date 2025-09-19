@@ -152,9 +152,9 @@ master:
       - table: trn_cost_inventory_category_centre
         field: ledger
       - table: trn_bill
-        field: ledger
+        field: name
       - table: trn_bank
-        field: ledger
+        field: transaction_type
       - table: trn_inventory_accounting
         field: ledger
       - table: trn_payhead
@@ -710,7 +710,7 @@ master:
         field: ..Name
         type: text
       - name: _item
-        field: $Guid:StockItem:$..Name
+        field: $Guid:StockItem:..Name
         type: text
       - name: opening_balance
         field: $$StringFindAndReplace:($$Number:$$String:$OpeningBalance):"(-)":"-"
@@ -739,7 +739,7 @@ master:
         field: ..Name
         type: text
       - name: _ledger
-        field: $Guid:Ledger:$..Name
+        field: $Guid:Ledger:..Name
         type: text
       - name: opening_balance
         field: OpeningBalance
@@ -767,9 +767,6 @@ master:
     fields:
       - name: ledger
         field: Name
-        type: text
-      - name: _ledger
-        field: $Guid:Ledger:$..Name
         type: text
       - name: stock_date
         field: Date
@@ -918,6 +915,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -952,6 +961,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: item
         field: StockItemName
         type: text
@@ -1016,6 +1037,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -1047,17 +1080,23 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: costcategory
         field: Category
         type: text
       - name: _costcategory
-        field: $Guid:CostCategory:$Name
+        field: $Guid:CostCategory:$Category
         type: text
       - name: costcentre
         field: Name
@@ -1084,6 +1123,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -1100,7 +1151,7 @@ transaction:
         field: Category
         type: text
       - name: _costcategory
-        field: $Guid:CostCategory:$Name
+        field: $Guid:CostCategory:$Category
         type: text
       - name: costcentre
         field: Name
@@ -1127,12 +1178,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: name
         field: Name
         type: text
@@ -1167,12 +1224,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: ..LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:$..LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: transaction_type
         field: TransactionType
         type: text
@@ -1207,6 +1270,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: item
         field: StockItemName
         type: text
@@ -1253,6 +1328,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -1281,6 +1368,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: category
         field: Category
         type: text
@@ -1315,6 +1414,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: category
         field: Category
         type: text
@@ -1358,6 +1469,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: employee_name
         field: Name
         type: text
