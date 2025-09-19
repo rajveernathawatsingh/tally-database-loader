@@ -39,6 +39,7 @@ master:
       - name: group_level
         field: $$StringLength:$$FullName:$Name
         type: number
+
   - name: mst_ledger
     collection: Ledger
     nature: Primary
@@ -145,6 +146,7 @@ master:
       - name: maintain_billwise
         field: IsBillwiseOn
         type: logical
+
   - name: mst_vouchertype
     collection: VoucherType
     nature: Primary
@@ -173,6 +175,7 @@ master:
       - name: affects_stock
         field: AffectsStock
         type: logical
+
   - name: mst_uom
     collection: Unit
     nature: Primary
@@ -204,6 +207,7 @@ master:
       - name: conversion
         field: Conversion
         type: number
+
   - name: mst_godown
     collection: Godown
     nature: Primary
@@ -229,6 +233,7 @@ master:
       - name: parent_guid
         field: if $$IsEmpty:$Parent then "" else $Guid:Godown:$Parent
         type: text
+
   - name: mst_stock_group
     collection: StockGroup
     nature: Primary
@@ -248,6 +253,7 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
+
   - name: mst_stock_category
     collection: StockCategory
     nature: Primary
@@ -267,6 +273,7 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
+
   - name: mst_stock_item
     collection: StockItem
     nature: Primary
@@ -357,6 +364,7 @@ master:
       - name: is_serial_no_on
         field: IsSerialNoOn
         type: logical
+
   - name: mst_cost_category
     collection: CostCategory
     nature: Primary
@@ -364,12 +372,6 @@ master:
       - name: guid
         field: Guid
         type: text
-      - name: master_id
-        field: MasterId
-        type: number
-      - name: alter_id
-        field: AlterId
-        type: number
       - name: name
         field: Name
         type: text
@@ -379,6 +381,7 @@ master:
       - name: allocate_non_revenue
         field: AllocateNonRevenue
         type: logical
+
   - name: mst_cost_centre
     collection: CostCentre
     nature: Primary
@@ -386,12 +389,6 @@ master:
       - name: guid
         field: Guid
         type: text
-      - name: master_id
-        field: MasterId
-        type: number
-      - name: alter_id
-        field: AlterId
-        type: number
       - name: name
         field: Name
         type: text
@@ -401,6 +398,7 @@ master:
       - name: category
         field: Category
         type: text
+
   - name: mst_attendance_type
     collection: AttendanceType
     nature: Primary
@@ -408,12 +406,6 @@ master:
       - name: guid
         field: Guid
         type: text
-      - name: master_id
-        field: MasterId
-        type: number
-      - name: alter_id
-        field: AlterId
-        type: number
       - name: name
         field: Name
         type: text
@@ -429,6 +421,7 @@ master:
       - name: attendance_period
         field: AttendancePeriod
         type: text
+
   - name: mst_employee
     collection: CostCentre
     nature: Primary
@@ -438,12 +431,6 @@ master:
       - name: guid
         field: Guid
         type: text
-      - name: master_id
-        field: MasterId
-        type: number
-      - name: alter_id
-        field: AlterId
-        type: number
       - name: name
         field: Name
         type: text
@@ -513,6 +500,7 @@ master:
       - name: pr_account_number
         field: PRAccountNumber
         type: text
+
   - name: mst_payhead
     collection: Ledger
     nature: Primary
@@ -522,12 +510,6 @@ master:
       - name: guid
         field: Guid
         type: text
-      - name: master_id
-        field: MasterId
-        type: number
-      - name: alter_id
-        field: AlterId
-        type: number
       - name: name
         field: Name
         type: text
@@ -552,6 +534,7 @@ master:
       - name: calculation_period
         field: CalculationPeriod
         type: text
+
   - name: mst_gst_effective_rate
     collection: StockItem.GstDetails
     nature: Derived
@@ -589,6 +572,7 @@ master:
       - name: taxability
         field: Taxability
         type: text
+
   - name: mst_opening_batch_allocation
     collection: StockItem.BatchAllocations
     nature: Derived
@@ -613,6 +597,7 @@ master:
       - name: godown
         field: GodownName
         type: text
+
   - name: mst_opening_bill_allocation
     collection: Ledger.BillAllocations
     nature: Derived
@@ -637,6 +622,7 @@ master:
       - name: is_advance
         field: IsAdvance
         type: logical
+
   - name: trn_closingstock_ledger
     collection: Ledger.LedgerClosingValues
     nature: Derived
@@ -654,6 +640,7 @@ master:
       - name: stock_value
         field: Amount
         type: amount
+
   - name: mst_stockitem_standard_cost
     collection: StockItem.StandardCostList
     nature: Derived
@@ -671,6 +658,7 @@ master:
       - name: rate
         field: Rate
         type: rate
+
   - name: mst_stockitem_standard_price
     collection: StockItem.StandardPriceList
     nature: Derived
@@ -750,6 +738,7 @@ transaction:
       - name: is_order_voucher
         field: if $$IsOrderVch:$VoucherTypeName then 1 else 0
         type: logical
+
   - name: trn_accounting
     collection: Voucher.AllLedgerEntries
     nature: Derived
@@ -766,6 +755,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: line_no
         field: $$LineIndex
         type: number
@@ -787,6 +788,7 @@ transaction:
       - name: currency
         field: $$Currency:$Amount
         type: text
+
   - name: trn_inventory
     collection: Voucher.AllInventoryEntries
     nature: Derived
@@ -803,6 +805,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: line_no
         field: $$LineIndex
         type: number
@@ -854,6 +868,7 @@ transaction:
       - name: order_duedate
         field: OrderDueDate
         type: date
+
   - name: trn_cost_centre
     collection: Voucher.AllLedgerEntries.CostCentreAllocations
     nature: Derived
@@ -870,6 +885,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -885,6 +912,7 @@ transaction:
       - name: amount
         field: Amount
         type: amount
+
   - name: trn_cost_category_centre
     collection: Voucher.AllLedgerEntries.CategoryAllocations.CostCentreAllocations
     nature: Derived
@@ -901,12 +929,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: ledger_guid
-        field: $Guid:Ledger:$LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: costcategory
         field: Category
         type: text
@@ -922,6 +956,7 @@ transaction:
       - name: amount
         field: Amount
         type: amount
+
   - name: trn_cost_inventory_category_centre
     collection: Voucher.AllLedgerEntries.InventoryAllocations.CategoryAllocations.CostCentreAllocations
     nature: Derived
@@ -938,6 +973,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -965,6 +1012,7 @@ transaction:
       - name: amount
         field: Amount
         type: amount
+
   - name: trn_bill
     collection: Voucher.AllLedgerEntries.BillAllocations
     nature: Derived
@@ -981,12 +1029,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: ledger_guid
-        field: $Guid:Ledger:$LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: name
         field: Name
         type: text
@@ -1005,6 +1059,7 @@ transaction:
       - name: is_advance
         field: IsAdvance
         type: logical
+
   - name: trn_bank
     collection: Voucher.AllLedgerEntries.BankAllocations
     nature: Derived
@@ -1021,12 +1076,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
-      - name: ledger
-        field: ..LedgerName
+      - name: voucher_guid
+        field: ..Guid
         type: text
-      - name: ledger_guid
-        field: $Guid:Ledger:$..LedgerName
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
         type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: transaction_type
         field: TransactionType
         type: text
@@ -1045,6 +1106,7 @@ transaction:
       - name: bankers_date
         field: BankersDate
         type: date
+
   - name: trn_batch
     collection: Voucher.AllInventoryEntries.BatchAllocations
     nature: Derived
@@ -1058,6 +1120,21 @@ transaction:
       - name: guid
         field: Guid
         type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: item
         field: StockItemName
         type: text
@@ -1079,6 +1156,7 @@ transaction:
       - name: tracking_number
         field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
         type: text
+
   - name: trn_inventory_accounting
     collection: Voucher.LedgerEntries
     nature: Derived
@@ -1095,6 +1173,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: ledger
         field: LedgerName
         type: text
@@ -1107,6 +1197,7 @@ transaction:
       - name: additional_allocation_type
         field: AddlAllocType
         type: text
+
   - name: trn_employee
     collection: Voucher.CategoryEntry.EmployeeEntry
     nature: Derived
@@ -1123,6 +1214,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: category
         field: Category
         type: text
@@ -1135,6 +1238,7 @@ transaction:
       - name: employee_sort_order
         field: EmployeeSortOrder
         type: number
+
   - name: trn_payhead
     collection: Voucher.CategoryEntry.EmployeeEntry.PayheadAllocations
     nature: Derived
@@ -1151,6 +1255,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: category
         field: Category
         type: text
@@ -1169,6 +1285,7 @@ transaction:
       - name: amount
         field: Amount
         type: amount
+
   - name: trn_attendance
     collection: Voucher.AttendanceEntries
     nature: Derived
@@ -1185,6 +1302,18 @@ transaction:
       - name: voucher_key
         field: ..VoucherKey
         type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
       - name: employee_name
         field: Name
         type: text
