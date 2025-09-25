@@ -250,8 +250,11 @@ class _database {
                             sqlQuery += `(${activeLine}),`; //enclose row values into round braces
                         }
 
-                        sqlQuery = sqlQuery.substr(0, sqlQuery.length - 1) + ';'; //remove last trailing comma and append colon
-                        rowCount += await this.executeNonQuery(sqlQuery);
+                        //only execute query if we actually added rows to avoid SQL syntax error
+                        if (countBatch > 0) {
+                            sqlQuery = sqlQuery.substr(0, sqlQuery.length - 1) + ';'; //remove last trailing comma and append semicolon
+                            rowCount += await this.executeNonQuery(sqlQuery);
+                        }
                     }
                 }
                 else { //File based loading
