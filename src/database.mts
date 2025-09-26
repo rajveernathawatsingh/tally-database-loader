@@ -399,7 +399,7 @@ class _database {
                     skipLeadingRows: 1,
                     writeDisposition: 'WRITE_TRUNCATE'
                 });
-                let retval = parseInt(.statistics?.load?.outputRows || '0');
+                let retval = parseInt(job.statistics?.load?.outputRows || '0');
                 resolve(retval);
             } catch (err) {
                 reject(err);
