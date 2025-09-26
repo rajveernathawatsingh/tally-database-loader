@@ -208,6 +208,9 @@ class _database {
 
     bulkLoad(csvFile: string, targetTable: string, lstFieldType: string[]): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
+            
+            console.log("--- EXECUTING THE NEW, CORRECTED BULKLOAD FUNCTION ---"); // <-- SMOKE TEST
+
             let sqlQuery = '';
             try {
                 sqlQuery = '';
