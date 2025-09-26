@@ -6,6 +6,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -36,6 +39,9 @@ master:
       - name: sort_position
         field: SortPosition
         type: number
+      - name: group_level
+        field: $$StringLength:$$FullName:$Name
+        type: number
     cascade_update:
       - table: mst_group
         field: parent
@@ -49,6 +55,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -60,6 +69,12 @@ master:
         type: text
       - name: _parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:Group:$Parent
+        type: text
+      - name: group_name
+        field: $$GroupName:$Name
+        type: text
+      - name: primary_group
+        field: $$PrimaryGroupName:$Name
         type: text
       - name: alias
         field: OnlyAlias
@@ -172,6 +187,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -206,6 +224,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -238,6 +259,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -252,6 +276,9 @@ master:
         type: text
       - name: address
         field: if $$IsEmpty:$Address then "" else $$FullList:Address:$Address
+        type: text
+      - name: parent_guid
+        field: if $$IsEmpty:$Parent then "" else $Guid:Godown:$Parent
         type: text
     cascade_update:
       - table: mst_godown
@@ -272,6 +299,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -297,6 +327,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -324,6 +357,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: master_id
+        field: MasterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -340,6 +376,9 @@ master:
         field: if $$IsEmpty:$StockCategory then "" else $StockCategory
         type: text
       - name: _stock_category
+        field: if $$IsEmpty:$StockCategory then "" else $Guid:StockCategory:$StockCategory
+        type: text
+      - name: stock_category_guid
         field: if $$IsEmpty:$StockCategory then "" else $Guid:StockCategory:$StockCategory
         type: text
       - name: alias
@@ -664,6 +703,7 @@ master:
     nature: Derived
     filters:
       - NOT $$IsEmpty:$GstApplicable
+      - $$NumItems:GstDetails > 0
     fields:
       - name: item
         field: Name
@@ -702,6 +742,8 @@ master:
   - name: mst_opening_batch_allocation
     collection: StockItem.BatchAllocations
     nature: Derived
+    filters:
+      - $$NumItems:BatchAllocations > 0
     fields:
       - name: name
         field: BatchName
@@ -734,6 +776,8 @@ master:
   - name: mst_opening_bill_allocation
     collection: Ledger.BillAllocations
     nature: Derived
+    filters:
+      - $$NumItems:BillAllocations > 0
     fields:
       - name: ledger
         field: ..Name
@@ -780,6 +824,8 @@ master:
     nature: Derived
     fetch:
       - StandardCostList
+    filters:
+      - $$NumItems:StandardCostList > 0
     fields:
       - name: item
         field: Name
@@ -799,6 +845,8 @@ master:
     nature: Derived
     fetch:
       - StandardPriceList
+    filters:
+      - $$NumItems:StandardPriceList > 0
     fields:
       - name: item
         field: Name
@@ -826,11 +874,14 @@ transaction:
       - name: guid
         field: Guid
         type: text
-      - name: alterid
-        field: AlterId
-        type: number
       - name: voucher_key
         field: VoucherKey
+        type: number
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alterid
+        field: AlterId
         type: number
       - name: date
         field: Date
@@ -857,6 +908,9 @@ transaction:
         field: PartyLedgerName
         type: text
       - name: _party_name
+        field: if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName
+        type: text
+      - name: party_guid
         field: if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName
         type: text
       - name: place_of_supply
@@ -908,6 +962,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -927,10 +982,16 @@ transaction:
       - name: voucher_date
         field: ..Date
         type: date
+      - name: line_no
+        field: $$LineIndex
+        type: number
       - name: ledger
         field: LedgerName
         type: text
       - name: _ledger
+        field: $Guid:Ledger:$LedgerName
+        type: text
+      - name: ledger_guid
         field: $Guid:Ledger:$LedgerName
         type: text
       - name: amount
@@ -954,6 +1015,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllInventoryEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -973,10 +1035,16 @@ transaction:
       - name: voucher_date
         field: ..Date
         type: date
+      - name: line_no
+        field: $$LineIndex
+        type: number
       - name: item
         field: StockItemName
         type: text
       - name: _item
+        field: $Guid:StockItem:$StockItemName
+        type: text
+      - name: item_guid
         field: $Guid:StockItem:$StockItemName
         type: text
       - name: quantity
@@ -1012,6 +1080,9 @@ transaction:
       - name: _godown
         field: $Guid:Godown:$GodownName
         type: text
+      - name: godown_guid
+        field: $Guid:Godown:$GodownName
+        type: text
       - name: tracking_number
         field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
         type: text
@@ -1030,6 +1101,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1055,10 +1127,16 @@ transaction:
       - name: _ledger
         field: $Guid:Ledger:$LedgerName
         type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
       - name: costcentre
         field: Name
         type: text
       - name: _costcentre
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: costcentre_guid
         field: $Guid:CostCentre:$Name
         type: text
       - name: amount
@@ -1073,6 +1151,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1098,10 +1177,16 @@ transaction:
       - name: _costcategory
         field: $Guid:CostCategory:$Category
         type: text
+      - name: costcategory_guid
+        field: $Guid:CostCategory:$Category
+        type: text
       - name: costcentre
         field: Name
         type: text
       - name: _costcentre
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: costcentre_guid
         field: $Guid:CostCentre:$Name
         type: text
       - name: amount
@@ -1116,6 +1201,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1141,10 +1227,16 @@ transaction:
       - name: _ledger
         field: $Guid:Ledger:$LedgerName
         type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
       - name: item
         field: StockItemName
         type: text
       - name: _item
+        field: $Guid:StockItem:$StockItemName
+        type: text
+      - name: item_guid
         field: $Guid:StockItem:$StockItemName
         type: text
       - name: costcategory
@@ -1153,10 +1245,16 @@ transaction:
       - name: _costcategory
         field: $Guid:CostCategory:$Category
         type: text
+      - name: costcategory_guid
+        field: $Guid:CostCategory:$Category
+        type: text
       - name: costcentre
         field: Name
         type: text
       - name: _costcentre
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: costcentre_guid
         field: $Guid:CostCentre:$Name
         type: text
       - name: amount
@@ -1171,6 +1269,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1217,6 +1316,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1263,6 +1363,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AllInventoryEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1321,6 +1422,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:LedgerEntries > 0
     fields:
       - name: guid
         field: Guid
@@ -1346,6 +1448,9 @@ transaction:
       - name: _ledger
         field: $Guid:Ledger:$LedgerName
         type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
       - name: amount
         field: Amount
         type: amount
@@ -1361,6 +1466,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:CategoryEntry > 0
     fields:
       - name: guid
         field: Guid
@@ -1407,6 +1513,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:CategoryEntry > 0
     fields:
       - name: guid
         field: Guid
@@ -1462,6 +1569,7 @@ transaction:
     filters:
       - NOT $IsCancelled
       - NOT $IsOptional
+      - $$NumItems:AttendanceEntries > 0
     fields:
       - name: guid
         field: Guid
