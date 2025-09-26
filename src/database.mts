@@ -208,9 +208,6 @@ class _database {
 
     bulkLoad(csvFile: string, targetTable: string, lstFieldType: string[]): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
-            
-            console.log("--- EXECUTING THE NEW, CORRECTED BULKLOAD FUNCTION ---"); // <-- SMOKE TEST
-
             let sqlQuery = '';
             try {
                 sqlQuery = '';
@@ -229,10 +226,12 @@ class _database {
                         //run a loop to keep on appending row to SQL Query values until max allowable size of query is exhausted
                         while (lstLines.length && (batchSize + lstLines[0].length + 3 < maxQuerySize) && dataRows.length < 1000) {
                             let activeLine = lstLines.shift() || '';
-                            if (activeLine === '') continue;
+                            if (activeLine === '' || activeLine.trim() === '') continue;
 
                             batchSize += activeLine.length;
-                            let lstValues = activeLine.split('\t');
+                            // Trim trailing tabs/commas that might cause empty values
+                            let lstValues = activeLine.trim().split('\t');
+                            
                             for (let i = 0; i < lstValues.length; i++) {
                                 let targetFieldType = lstFieldType[i];
                                 let targetFieldValue = lstValues[i];
@@ -249,9 +248,19 @@ class _database {
                                 else if (targetFieldType == 'date') {
                                     lstValues[i] = targetFieldValue == 'ñ' ? 'NULL' : `'${targetFieldValue}'`;
                                 }
-                                else;
+                                else {
+                                    // Sanitize numeric and other types
+                                    if (targetFieldValue === '' || targetFieldValue === 'ñ') {
+                                        lstValues[i] = 'NULL';
+                                    } else {
+                                        lstValues[i] = targetFieldValue;
+                                    }
+                                }
                             }
-                            dataRows.push(`(${lstValues.join(',')})`);
+                            // Ensure the number of values matches the number of fields
+                            if (lstValues.length === fieldList.split(',').length) {
+                                dataRows.push(`(${lstValues.join(',')})`);
+                            }
                         }
 
                         //only execute query if we actually added rows to avoid SQL syntax error
@@ -390,7 +399,7 @@ class _database {
                     skipLeadingRows: 1,
                     writeDisposition: 'WRITE_TRUNCATE'
                 });
-                let retval = parseInt(job.statistics?.load?.outputRows || '0');
+                let retval = parseInt(.statistics?.load?.outputRows || '0');
                 resolve(retval);
             } catch (err) {
                 reject(err);
