@@ -152,7 +152,6 @@ create table mst_stock_item
 create table mst_cost_category
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
  name nvarchar(1024) not null default '',
  allocate_revenue tinyint,
  allocate_non_revenue tinyint
@@ -161,7 +160,6 @@ create table mst_cost_category
 create table mst_cost_centre
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -171,7 +169,6 @@ create table mst_cost_centre
 create table mst_attendance_type
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -184,7 +181,6 @@ create table mst_attendance_type
 create table mst_employee
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -214,7 +210,6 @@ create table mst_employee
 create table mst_payhead
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
