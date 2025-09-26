@@ -220,13 +220,15 @@ class _database {
                     fieldList = fieldList.replace(/\t/g, ','); //replace tab with comma for header
 
                     while (lstLines.length) { //loop until row is found
-                        sqlQuery = `insert into ${targetTable} (${fieldList}) values`;
-
-                        let countBatch = 0; //number of rows in batch
+                        let dataRows: string[] = [];
+                        let batchSize = 0;
 
                         //run a loop to keep on appending row to SQL Query values until max allowable size of query is exhausted
-                        while (lstLines.length && (sqlQuery.length + lstLines[0].length + 3 < maxQuerySize) && ++countBatch <= 1000) {
+                        while (lstLines.length && (batchSize + lstLines[0].length + 3 < maxQuerySize) && dataRows.length < 1000) {
                             let activeLine = lstLines.shift() || '';
+                            if (activeLine === '') continue;
+
+                            batchSize += activeLine.length;
                             let lstValues = activeLine.split('\t');
                             for (let i = 0; i < lstValues.length; i++) {
                                 let targetFieldType = lstFieldType[i];
@@ -246,13 +248,12 @@ class _database {
                                 }
                                 else;
                             }
-                            activeLine = lstValues.join(','); //prepare SQL statement with values separated by comma
-                            sqlQuery += `(${activeLine}),`; //enclose row values into round braces
+                            dataRows.push(`(${lstValues.join(',')})`);
                         }
 
                         //only execute query if we actually added rows to avoid SQL syntax error
-                        if (countBatch > 0) {
-                            sqlQuery = sqlQuery.substr(0, sqlQuery.length - 1) + ';'; //remove last trailing comma and append semicolon
+                        if (dataRows.length > 0) {
+                            sqlQuery = `insert into ${targetTable} (${fieldList}) values ${dataRows.join(',')};`;
                             rowCount += await this.executeNonQuery(sqlQuery);
                         }
                     }
