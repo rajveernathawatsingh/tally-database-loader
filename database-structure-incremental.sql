@@ -24,7 +24,7 @@ create table config
 create table mst_group
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -39,7 +39,7 @@ create table mst_group
 create table mst_ledger
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -75,7 +75,7 @@ create table mst_ledger
 create table mst_vouchertype
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -87,7 +87,7 @@ create table mst_vouchertype
 create table mst_uom
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  formalname nvarchar(256) not null default '',
  is_simple_unit tinyint not null,
@@ -99,7 +99,7 @@ create table mst_uom
 create table mst_godown
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -109,7 +109,7 @@ create table mst_godown
 create table mst_stock_group
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default ''
@@ -118,7 +118,7 @@ create table mst_stock_group
 create table mst_stock_category
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default ''
@@ -127,7 +127,7 @@ create table mst_stock_category
 create table mst_stock_item
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -161,7 +161,7 @@ create table mst_stock_item
 create table mst_cost_category
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  allocate_revenue tinyint,
  allocate_non_revenue tinyint
@@ -170,7 +170,7 @@ create table mst_cost_category
 create table mst_cost_centre
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -180,7 +180,7 @@ create table mst_cost_centre
 create table mst_attendance_type
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -193,7 +193,7 @@ create table mst_attendance_type
 create table mst_employee
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -223,7 +223,7 @@ create table mst_employee
 create table mst_payhead
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ alter_id int not null default 0,
  name nvarchar(1024) not null default '',
  parent nvarchar(1024) not null default '',
  _parent varchar(64) not null default '',
@@ -301,7 +301,8 @@ create table mst_stockitem_standard_price
 create table trn_voucher
 (
  guid varchar(64) not null primary key,
- alterid int not null default 0,
+ master_id int not null default 0,
+ alter_id int not null default 0,
  voucher_key int not null default 0,
  date date not null,
  voucher_type nvarchar(1024) not null,
