@@ -9,6 +9,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -17,9 +20,6 @@ master:
         type: text
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
-        type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:Group:$Parent
         type: text
       - name: primary_group
         field: _PrimaryGroup
@@ -42,11 +42,6 @@ master:
       - name: group_level
         field: $$StringLength:$$FullName:$Name
         type: number
-    cascade_update:
-      - table: mst_group
-        field: parent
-      - table: mst_ledger
-        field: parent
 
   - name: mst_ledger
     collection: Ledger
@@ -58,6 +53,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -66,9 +64,6 @@ master:
         type: text
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
-        type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:Group:$Parent
         type: text
       - name: group_name
         field: $$GroupName:$Name
@@ -157,28 +152,6 @@ master:
       - name: maintain_billwise
         field: IsBillwiseOn
         type: logical
-    cascade_update:
-      - table: trn_accounting
-        field: ledger
-      - table: trn_cost_centre
-        field: ledger
-      - table: trn_cost_category_centre
-        field: ledger
-      - table: trn_cost_inventory_category_centre
-        field: ledger
-      - table: trn_bill
-        field: name
-      - table: trn_bank
-        field: transaction_type
-      - table: trn_inventory_accounting
-        field: ledger
-      - table: trn_payhead
-        field: payhead_name
-    cascade_delete:
-      - table: mst_opening_bill_allocation
-        field: _ledger
-      - table: trn_closingstock_ledger
-        field: _ledger
 
   - name: mst_vouchertype
     collection: VoucherType
@@ -190,6 +163,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -198,9 +174,6 @@ master:
         type: text
       - name: parent
         field: Parent
-        type: text
-      - name: _parent
-        field: $Guid:VoucherType:$Parent
         type: text
       - name: numbering_method
         field: NumberingMethod
@@ -211,11 +184,6 @@ master:
       - name: affects_stock
         field: AffectsStock
         type: logical
-    cascade_update:
-      - table: mst_vouchertype
-        field: parent
-      - table: trn_voucher
-        field: voucher_type
 
   - name: mst_uom
     collection: Unit
@@ -226,6 +194,9 @@ master:
         type: text
       - name: master_id
         field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
         type: number
       - name: alterid
         field: AlterId
@@ -248,9 +219,6 @@ master:
       - name: conversion
         field: Conversion
         type: number
-    cascade_update:
-      - table: mst_stock_item
-        field: uom
 
   - name: mst_godown
     collection: Godown
@@ -262,6 +230,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -271,26 +242,12 @@ master:
       - name: parent
         field: Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:Godown:$Parent
-        type: text
       - name: address
         field: if $$IsEmpty:$Address then "" else $$FullList:Address:$Address
         type: text
       - name: parent_guid
         field: if $$IsEmpty:$Parent then "" else $Guid:Godown:$Parent
         type: text
-    cascade_update:
-      - table: mst_godown
-        field: parent
-      - table: mst_opening_batch_allocation
-        field: godown
-      - table: trn_inventory
-        field: godown
-      - table: trn_batch
-        field: godown
-      - table: trn_batch
-        field: destination_godown
 
   - name: mst_stock_group
     collection: StockGroup
@@ -302,6 +259,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -311,14 +271,6 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:StockGroup:$Parent
-        type: text
-    cascade_update:
-      - table: mst_stock_group
-        field: parent
-      - table: mst_stock_item
-        field: parent
 
   - name: mst_stock_category
     collection: StockCategory
@@ -330,6 +282,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -339,14 +294,6 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:StockCategory:$Parent
-        type: text
-    cascade_update:
-      - table: mst_stock_category
-        field: parent
-      - table: mst_stock_item
-        field: stock_category
 
   - name: mst_stock_item
     collection: StockItem
@@ -360,6 +307,9 @@ master:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -369,14 +319,8 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:StockGroup:$Parent
-        type: text
       - name: stock_category
         field: if $$IsEmpty:$StockCategory then "" else $StockCategory
-        type: text
-      - name: _stock_category
-        field: if $$IsEmpty:$StockCategory then "" else $Guid:StockCategory:$StockCategory
         type: text
       - name: stock_category_guid
         field: if $$IsEmpty:$StockCategory then "" else $Guid:StockCategory:$StockCategory
@@ -396,14 +340,8 @@ master:
       - name: uom
         field: if $$IsEqual:$BaseUnits:$$SysName:NotApplicable then "" else $BaseUnits
         type: text
-      - name: _uom
-        field: $Guid:Unit:$BaseUnits
-        type: text
       - name: alternate_uom
         field: if $$IsEqual:$AdditionalUnits:$$SysName:NotApplicable then "" else $AdditionalUnits
-        type: text
-      - name: _alternate_uom
-        field: $Guid:Unit:$AdditionalUnits
         type: text
       - name: conversion
         field: Conversion
@@ -450,26 +388,6 @@ master:
       - name: is_serial_no_on
         field: IsSerialNoOn
         type: logical
-    cascade_update:
-      - table: trn_inventory
-        field: item
-      - table: trn_batch
-        field: item
-      - table: trn_cost_inventory_category_centre
-        field: item
-      - table: mst_stockitem_standard_cost
-        field: item
-      - table: mst_stockitem_standard_price
-        field: item
-    cascade_delete:
-      - table: mst_gst_effective_rate
-        field: _item
-      - table: mst_opening_batch_allocation
-        field: _item
-      - table: mst_stockitem_standard_cost
-        field: _item
-      - table: mst_stockitem_standard_price
-        field: _item
 
   - name: mst_cost_category
     collection: CostCategory
@@ -478,6 +396,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -490,17 +411,6 @@ master:
       - name: allocate_non_revenue
         field: AllocateNonRevenue
         type: logical
-    cascade_update:
-      - table: mst_cost_centre
-        field: parent
-      - table: trn_cost_category_centre
-        field: costcategory
-      - table: trn_cost_inventory_category_centre
-        field: costcategory
-      - table: trn_employee
-        field: category
-      - table: trn_payhead
-        field: category
 
   - name: mst_cost_centre
     collection: CostCentre
@@ -509,6 +419,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -518,25 +431,9 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:CostCategory:$Parent
-        type: text
       - name: category
         field: Category
         type: text
-    cascade_update:
-      - table: trn_cost_centre
-        field: costcentre
-      - table: trn_cost_category_centre
-        field: costcentre
-      - table: trn_cost_inventory_category_centre
-        field: costcentre
-      - table: trn_employee
-        field: employee_name
-      - table: trn_payhead
-        field: employee_name
-      - table: trn_attendance
-        field: employee_name
 
   - name: mst_attendance_type
     collection: AttendanceType
@@ -545,6 +442,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -554,14 +454,8 @@ master:
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
         type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:AttendanceType:$Parent
-        type: text
       - name: uom
         field: if $$IsNotApplicable:$BaseUnits then "" else $BaseUnits
-        type: text
-      - name: _uom
-        field: $Guid:Unit:$BaseUnits
         type: text
       - name: attendance_type
         field: AttendanceProductionType
@@ -569,9 +463,6 @@ master:
       - name: attendance_period
         field: AttendancePeriod
         type: text
-    cascade_update:
-      - table: trn_attendance
-        field: attendancetype_name
 
   - name: mst_employee
     collection: CostCentre
@@ -582,6 +473,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -590,9 +484,6 @@ master:
         type: text
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
-        type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:CostCategory:$Parent
         type: text
       - name: id_number
         field: MailingName
@@ -667,6 +558,9 @@ master:
       - name: guid
         field: Guid
         type: text
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -675,9 +569,6 @@ master:
         type: text
       - name: parent
         field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
-        type: text
-      - name: _parent
-        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Guid:Ledger:$Parent
         type: text
       - name: payslip_name
         field: PaySlipName
@@ -708,8 +599,8 @@ master:
       - name: item
         field: Name
         type: text
-      - name: _item
-        field: $Guid:StockItem:$Name
+      - name: item_guid
+        field: ..Guid
         type: text
       - name: applicable_from
         field: Applicablefrom
@@ -751,8 +642,8 @@ master:
       - name: item
         field: ..Name
         type: text
-      - name: _item
-        field: $Guid:StockItem:..Name
+      - name: item_guid
+        field: ..Guid
         type: text
       - name: opening_balance
         field: $$StringFindAndReplace:($$Number:$$String:$OpeningBalance):"(-)":"-"
@@ -766,7 +657,7 @@ master:
       - name: godown
         field: GodownName
         type: text
-      - name: _godown
+      - name: godown_guid
         field: $Guid:Godown:$GodownName
         type: text
       - name: manufactured_on
@@ -782,8 +673,8 @@ master:
       - name: ledger
         field: ..Name
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:..Name
+      - name: ledger_guid
+        field: ..Guid
         type: text
       - name: opening_balance
         field: OpeningBalance
@@ -812,6 +703,9 @@ master:
       - name: ledger
         field: Name
         type: text
+      - name: ledger_guid
+        field: ..Guid
+        type: text
       - name: stock_date
         field: Date
         type: date
@@ -830,8 +724,8 @@ master:
       - name: item
         field: Name
         type: text
-      - name: _item
-        field: $Guid:StockItem:$Name
+      - name: item_guid
+        field: ..Guid
         type: text
       - name: date
         field: Date
@@ -851,8 +745,8 @@ master:
       - name: item
         field: Name
         type: text
-      - name: _item
-        field: $Guid:StockItem:$Name
+      - name: item_guid
+        field: ..Guid
         type: text
       - name: date
         field: Date
@@ -880,6 +774,9 @@ transaction:
       - name: master_id
         field: MasterId
         type: number
+      - name: alter_id
+        field: AlterId
+        type: number
       - name: alterid
         field: AlterId
         type: number
@@ -888,9 +785,6 @@ transaction:
         type: date
       - name: voucher_type
         field: VoucherTypeName
-        type: text
-      - name: _voucher_type
-        field: $Guid:VoucherType:$VoucherTypeName
         type: text
       - name: voucher_number
         field: VoucherNumber
@@ -906,9 +800,6 @@ transaction:
         type: text
       - name: party_name
         field: PartyLedgerName
-        type: text
-      - name: _party_name
-        field: if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName
         type: text
       - name: party_guid
         field: if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName
@@ -983,13 +874,10 @@ transaction:
         field: ..Date
         type: date
       - name: line_no
-        field: $$LineIndex
+        field: if $$IsEmpty:$$LineIndex then 1 else $$LineIndex
         type: number
       - name: ledger
         field: LedgerName
-        type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
         type: text
       - name: ledger_guid
         field: $Guid:Ledger:$LedgerName
@@ -1036,13 +924,10 @@ transaction:
         field: ..Date
         type: date
       - name: line_no
-        field: $$LineIndex
+        field: if $$IsEmpty:$$LineIndex then 1 else $$LineIndex
         type: number
       - name: item
         field: StockItemName
-        type: text
-      - name: _item
-        field: $Guid:StockItem:$StockItemName
         type: text
       - name: item_guid
         field: $Guid:StockItem:$StockItemName
@@ -1076,9 +961,6 @@ transaction:
         type: number
       - name: godown
         field: GodownName
-        type: text
-      - name: _godown
-        field: $Guid:Godown:$GodownName
         type: text
       - name: godown_guid
         field: $Guid:Godown:$GodownName
@@ -1124,17 +1006,11 @@ transaction:
       - name: ledger
         field: LedgerName
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
-        type: text
       - name: ledger_guid
         field: $Guid:Ledger:$LedgerName
         type: text
       - name: costcentre
         field: Name
-        type: text
-      - name: _costcentre
-        field: $Guid:CostCentre:$Name
         type: text
       - name: costcentre_guid
         field: $Guid:CostCentre:$Name
@@ -1174,17 +1050,11 @@ transaction:
       - name: costcategory
         field: Category
         type: text
-      - name: _costcategory
-        field: $Guid:CostCategory:$Category
-        type: text
       - name: costcategory_guid
         field: $Guid:CostCategory:$Category
         type: text
       - name: costcentre
         field: Name
-        type: text
-      - name: _costcentre
-        field: $Guid:CostCentre:$Name
         type: text
       - name: costcentre_guid
         field: $Guid:CostCentre:$Name
@@ -1224,17 +1094,11 @@ transaction:
       - name: ledger
         field: LedgerName
         type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
-        type: text
       - name: ledger_guid
         field: $Guid:Ledger:$LedgerName
         type: text
       - name: item
         field: StockItemName
-        type: text
-      - name: _item
-        field: $Guid:StockItem:$StockItemName
         type: text
       - name: item_guid
         field: $Guid:StockItem:$StockItemName
@@ -1242,17 +1106,11 @@ transaction:
       - name: costcategory
         field: Category
         type: text
-      - name: _costcategory
-        field: $Guid:CostCategory:$Category
-        type: text
       - name: costcategory_guid
         field: $Guid:CostCategory:$Category
         type: text
       - name: costcentre
         field: Name
-        type: text
-      - name: _costcentre
-        field: $Guid:CostCentre:$Name
         type: text
       - name: costcentre_guid
         field: $Guid:CostCentre:$Name
@@ -1386,8 +1244,8 @@ transaction:
       - name: item
         field: StockItemName
         type: text
-      - name: _item
-        field: if $$IsEmpty:$StockItemName then "" else $Guid:StockItem:$StockItemName
+      - name: item_guid
+        field: $Guid:StockItem:$StockItemName
         type: text
       - name: name
         field: BatchName
@@ -1401,13 +1259,13 @@ transaction:
       - name: godown
         field: GodownName
         type: text
-      - name: _godown
-        field: if $$IsEmpty:$GodownName then "" else $Guid:Godown:$GodownName
+      - name: godown_guid
+        field: $Guid:Godown:$GodownName
         type: text
       - name: destination_godown
         field: DestinationGodownName
         type: text
-      - name: _destination_godown
+      - name: destination_godown_guid
         field: if $$IsEmpty:$DestinationGodownName then "" else $Guid:Godown:$DestinationGodownName
         type: text
       - name: tracking_number
@@ -1444,9 +1302,6 @@ transaction:
         type: date
       - name: ledger
         field: LedgerName
-        type: text
-      - name: _ledger
-        field: $Guid:Ledger:$LedgerName
         type: text
       - name: ledger_guid
         field: $Guid:Ledger:$LedgerName
@@ -1489,14 +1344,8 @@ transaction:
       - name: category
         field: Category
         type: text
-      - name: _category
-        field: $Guid:CostCategory:$Category
-        type: text
       - name: employee_name
         field: EmployeeName
-        type: text
-      - name: _employee_name
-        field: $Guid:CostCentre:$EmployeeName
         type: text
       - name: amount
         field: Amount
@@ -1536,23 +1385,14 @@ transaction:
       - name: category
         field: Category
         type: text
-      - name: _category
-        field: $Guid:CostCategory:$Category
-        type: text
       - name: employee_name
         field: EmployeeName
-        type: text
-      - name: _employee_name
-        field: $Guid:CostCentre:$EmployeeName
         type: text
       - name: employee_sort_order
         field: EmployeeSortOrder
         type: number
       - name: payhead_name
         field: PayheadName
-        type: text
-      - name: _payhead_name
-        field: $Guid:Ledger:$PayheadName
         type: text
       - name: payhead_sort_order
         field: PayheadSortOrder
@@ -1592,14 +1432,8 @@ transaction:
       - name: employee_name
         field: Name
         type: text
-      - name: _employee_name
-        field: $Guid:CostCentre:$Name
-        type: text
       - name: attendancetype_name
         field: AttendanceType
-        type: text
-      - name: _attendancetype_name
-        field: $Guid:AttendanceType:$AttendanceType
         type: text
       - name: time_value
         field: AttdTypeTimeValue
