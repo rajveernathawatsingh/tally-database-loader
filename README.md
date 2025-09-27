@@ -1,7 +1,8 @@
 # Tally to Database Server: Data Loader Utility
 ![logo](https://excelkida.com/image/github/tally-database-loader.png)
 
-
+##Installation
+* After cloning the repository run "npx tsc -p ./src/tsconfig.json" for the updates.
 
 
 Commandline utility to load data into Database Server from Tally software, intended for further use by
@@ -345,3 +346,4 @@ Bug fixes or enhancements from various contributors
 * When multiple companies are selected in Tally &amp; specific company name is specified in config.json, it has been observed that in a rare case (especially on Windows Server), Tally fails to fetch data from that target company &amp; internally produces an error that specified company is not loaded.
 * It has been observed that sometimes when Tally remain running for several days on PC then in a rare case Tally fails to return back updated / latest data (especially on Windows Server) &amp; you may have to restart Tally.
 * If you have configured automatic sync of data via Windows Task Schedular, then make sure you don't log-off, but just disconnect as Tally is graphical based software.
+
