@@ -1,487 +1,1443 @@
-create table _diff
-(
- guid varchar(64) not null,
- alterid int not null
-);
+master:
+  - name: mst_group
+    collection: Group
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: primary_group
+        field: _PrimaryGroup
+        type: text
+      - name: is_revenue
+        field: IsRevenue
+        type: logical
+      - name: is_deemedpositive
+        field: IsDeemedPositive
+        type: logical
+      - name: is_reserved
+        field: IsReserved
+        type: logical
+      - name: affects_gross_profit
+        field: AffectsGrossProfit
+        type: logical
+      - name: sort_position
+        field: SortPosition
+        type: number
+      - name: group_level
+        field: $$StringLength:$$FullName:$Name
+        type: number
 
-create table _delete
-(
- guid varchar(64) not null
-);
+  - name: mst_ledger
+    collection: Ledger
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: group_name
+        field: $$GroupName:$Name
+        type: text
+      - name: primary_group
+        field: $$PrimaryGroupName:$Name
+        type: text
+      - name: alias
+        field: OnlyAlias
+        type: text
+      - name: description
+        field: Description
+        type: text
+      - name: notes
+        field: Narration
+        type: text
+      - name: is_revenue
+        field: IsRevenue
+        type: logical
+      - name: is_deemedpositive
+        field: IsDeemedPositive
+        type: logical
+      - name: opening_balance
+        field: OpeningBalance
+        type: amount
+      - name: closing_balance
+        field: ClosingBalance
+        type: amount
+      - name: mailing_name
+        field: MailingName
+        type: text
+      - name: mailing_address
+        field: if $$IsEmpty:$Address then "" else $$FullList:Address:$Address
+        type: text
+      - name: mailing_state
+        field: LedStateName
+        type: text
+      - name: mailing_country
+        field: CountryName
+        type: text
+      - name: mailing_pincode
+        field: PinCode
+        type: text
+      - name: email
+        field: Email
+        type: text
+      - name: it_pan
+        field: IncomeTaxNumber
+        type: text
+      - name: gstn
+        field: if $$IsEmpty:$PartyGSTIN then $LedGSTRegDetails[Last].GSTIN else $PartyGSTIN
+        type: text
+      - name: gst_registration_type
+        field: if $$IsEmpty:$Gstregistrationtype then $LedGSTRegDetails[Last].Gstregistrationtype else $Gstregistrationtype
+        type: text
+      - name: gst_supply_type
+        field: Gsttypeofsupply
+        type: text
+      - name: gst_duty_head
+        field: Gstdutyhead
+        type: text
+      - name: tax_rate
+        field: RateOfTaxCalculation
+        type: number
+      - name: bank_account_holder
+        field: Bankaccholdername
+        type: text
+      - name: bank_account_number
+        field: BankDetails
+        type: text
+      - name: bank_ifsc
+        field: Ifscode
+        type: text
+      - name: bank_swift
+        field: Swiftcode
+        type: text
+      - name: bank_name
+        field: Bankingconfigbank
+        type: text
+      - name: bank_branch
+        field: BankBranchname
+        type: text
+      - name: bill_credit_period
+        field: $$Number:$BillCreditPeriod
+        type: number
+      - name: maintain_billwise
+        field: IsBillwiseOn
+        type: logical
 
-create table _vchnumber
-(
- guid varchar(64) not null,
- voucher_number varchar(256) not null
-);
+  - name: mst_vouchertype
+    collection: VoucherType
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: Parent
+        type: text
+      - name: numbering_method
+        field: NumberingMethod
+        type: text
+      - name: is_deemedpositive
+        field: IsDeemedPositive
+        type: logical
+      - name: affects_stock
+        field: AffectsStock
+        type: logical
 
-create table config
-(
- name nvarchar(64) not null primary key,
- value nvarchar(1024)
-);
+  - name: mst_uom
+    collection: Unit
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Symbol
+        type: text
+      - name: formalname
+        field: FormalName
+        type: text
+      - name: is_simple_unit
+        field: IsSimpleUnit
+        type: logical
+      - name: base_units
+        field: BaseUnits
+        type: text
+      - name: additional_units
+        field: AdditionalUnits
+        type: text
+      - name: conversion
+        field: Conversion
+        type: number
 
-create table mst_group
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- primary_group nvarchar(1024) not null default '',
- is_revenue tinyint,
- is_deemedpositive tinyint,
- is_reserved tinyint,
- affects_gross_profit tinyint,
- sort_position int
-);
+  - name: mst_godown
+    collection: Godown
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: Parent
+        type: text
+      - name: address
+        field: if $$IsEmpty:$Address then "" else $$FullList:Address:$Address
+        type: text
+      - name: parent_guid
+        field: if $$IsEmpty:$Parent then "" else $Guid:Godown:$Parent
+        type: text
 
-create table mst_ledger
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- alias nvarchar(256) not null default '',
- description nvarchar(64) not null default '',
- notes nvarchar(64) not null default '',
- is_revenue tinyint,
- is_deemedpositive tinyint,
- opening_balance decimal(17,2) default 0,
- closing_balance decimal(17,2) default 0,
- mailing_name nvarchar(256) not null default '',
- mailing_address nvarchar(1024) not null default '',
- mailing_state nvarchar(256) not null default '',
- mailing_country nvarchar(256) not null default '',
- mailing_pincode nvarchar(64) not null default '',
- email nvarchar(256) not null default '',
- it_pan nvarchar(64) not null default '',
- gstn nvarchar(64) not null default '',
- gst_registration_type nvarchar(64) not null default '',
- gst_supply_type nvarchar(64) not null default '',
- gst_duty_head nvarchar(16) not null default '',
- tax_rate decimal(9,4) default 0,
- bank_account_holder nvarchar(256) not null default '',
- bank_account_number nvarchar(64) not null default '',
- bank_ifsc nvarchar(64) not null default '',
- bank_swift nvarchar(64) not null default '',
- bank_name nvarchar(64) not null default '',
- bank_branch nvarchar(64) not null default '',
- bill_credit_period int not null default 0,
- maintain_billwise tinyint
-);
+  - name: mst_stock_group
+    collection: StockGroup
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
 
-create table mst_vouchertype
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- numbering_method nvarchar(64) not null default '',
- is_deemedpositive tinyint,
- affects_stock tinyint
-);
+  - name: mst_stock_category
+    collection: StockCategory
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
 
-create table mst_uom
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- formalname nvarchar(256) not null default '',
- is_simple_unit tinyint not null,
- base_units nvarchar(1024) not null,
- additional_units nvarchar(1024) not null,
- conversion int not null
-);
+  - name: mst_stock_item
+    collection: StockItem
+    nature: Primary
+    fetch:
+      - GstDetails,PartNo
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: stock_category
+        field: if $$IsEmpty:$StockCategory then "" else $StockCategory
+        type: text
+      - name: stock_category_guid
+        field: if $$IsEmpty:$StockCategory then "" else $Guid:StockCategory:$StockCategory
+        type: text
+      - name: alias
+        field: OnlyAlias
+        type: text
+      - name: description
+        field: Description
+        type: text
+      - name: notes
+        field: Narration
+        type: text
+      - name: part_number
+        field: PartNo
+        type: text
+      - name: uom
+        field: if $$IsEqual:$BaseUnits:$$SysName:NotApplicable then "" else $BaseUnits
+        type: text
+      - name: alternate_uom
+        field: if $$IsEqual:$AdditionalUnits:$$SysName:NotApplicable then "" else $AdditionalUnits
+        type: text
+      - name: conversion
+        field: Conversion
+        type: number
+      - name: opening_balance
+        field: $$StringFindAndReplace:($$Number:$$String:$OpeningBalance):"(-)":"-"
+        type: number
+      - name: opening_rate
+        field: OpeningRate
+        type: rate
+      - name: opening_value
+        field: OpeningValue
+        type: amount
+      - name: closing_balance
+        field: $$StringFindAndReplace:($$Number:$$String:$ClosingBalance):"(-)":"-"
+        type: number
+      - name: closing_rate
+        field: ClosingRate
+        type: rate
+      - name: closing_value
+        field: ClosingValue
+        type: amount
+      - name: costing_method
+        field: CostingMethod
+        type: text
+      - name: gst_type_of_supply
+        field: GSTMSTTypeofSupply
+        type: text
+      - name: gst_hsn_code
+        field: InfGSTHSNCode
+        type: text
+      - name: gst_hsn_description
+        field: InfGSTHSNDescription
+        type: text
+      - name: gst_rate
+        field: InfGSTIGSTRate
+        type: number
+      - name: gst_taxability
+        field: InfGSTTaxablility
+        type: text
+      - name: is_batchwise_on
+        field: IsBatchWiseOn
+        type: logical
+      - name: is_serial_no_on
+        field: IsSerialNoOn
+        type: logical
 
-create table mst_godown
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- address nvarchar(1024) not null default ''
-);
+  - name: mst_cost_category
+    collection: CostCategory
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: allocate_revenue
+        field: AllocateRevenue
+        type: logical
+      - name: allocate_non_revenue
+        field: AllocateNonRevenue
+        type: logical
 
-create table mst_stock_group
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default ''
-);
+  - name: mst_cost_centre
+    collection: CostCentre
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: category
+        field: Category
+        type: text
 
-create table mst_stock_category
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default ''
-);
+  - name: mst_attendance_type
+    collection: AttendanceType
+    nature: Primary
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: uom
+        field: if $$IsNotApplicable:$BaseUnits then "" else $BaseUnits
+        type: text
+      - name: attendance_type
+        field: AttendanceProductionType
+        type: text
+      - name: attendance_period
+        field: AttendancePeriod
+        type: text
 
-create table mst_stock_item
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- stock_category nvarchar(1024) not null default '',
- _stock_category varchar(64) not null default '',
- alias nvarchar(256) not null default '',
- description nvarchar(64) not null default '',
- notes nvarchar(64) not null default '',
- part_number nvarchar(256) not null default '',
- uom nvarchar(32) not null default '',
- _uom varchar(64) not null default '',
- alternate_uom nvarchar(32) not null default '',
- _alternate_uom varchar(64) not null default '',
- conversion int not null default 0,
- opening_balance decimal(15,4) default 0,
- opening_rate decimal(15,4) default 0,
- opening_value decimal(17,2) default 0,
- closing_balance decimal(15,4) default 0,
- closing_rate decimal(15,4) default 0,
- closing_value decimal(17,2) default 0,
- costing_method nvarchar(32) not null default '',
- gst_type_of_supply nvarchar(32) default '',
- gst_hsn_code nvarchar(64) default '',
- gst_hsn_description nvarchar(256) default '',
- gst_rate decimal(9,4) default 0,
- gst_taxability nvarchar(32) default '',
- is_batchwise_on tinyint,
- is_serial_no_on tinyint
-);
+  - name: mst_employee
+    collection: CostCentre
+    nature: Primary
+    filters:
+      - $ForPayroll
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: id_number
+        field: MailingName
+        type: text
+      - name: date_of_joining
+        field: DateOfJoin
+        type: date
+      - name: date_of_release
+        field: DeactivationDate
+        type: date
+      - name: designation
+        field: Designation
+        type: text
+      - name: function_role
+        field: Function
+        type: text
+      - name: location
+        field: Location
+        type: text
+      - name: gender
+        field: if $$IsSysNameEqual:Unknown:$Gender then "" else $Gender
+        type: text
+      - name: date_of_birth
+        field: DateOfBirth
+        type: date
+      - name: blood_group
+        field: BloodGroup
+        type: text
+      - name: father_mother_name
+        field: FatherName
+        type: text
+      - name: spouse_name
+        field: SpouseName
+        type: text
+      - name: address
+        field: if $$IsEmpty:$Address then "" else $$FullList:Address:$Address
+        type: text
+      - name: mobile
+        field: MobileNumber
+        type: text
+      - name: email
+        field: EmailId
+        type: text
+      - name: pan
+        field: PanNumber
+        type: text
+      - name: aadhar
+        field: AadharNumber
+        type: text
+      - name: uan
+        field: UanNumber
+        type: text
+      - name: pf_number
+        field: PfAccountNumber
+        type: text
+      - name: pf_joining_date
+        field: PfJoiningDate
+        type: date
+      - name: pf_relieving_date
+        field: PfRelievingDate
+        type: date
+      - name: pr_account_number
+        field: PRAccountNumber
+        type: text
 
-create table mst_cost_category
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- allocate_revenue tinyint,
- allocate_non_revenue tinyint
-);
+  - name: mst_payhead
+    collection: Ledger
+    nature: Primary
+    filters:
+      - $ForPayroll
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: name
+        field: Name
+        type: text
+      - name: parent
+        field: if $$IsEqual:$Parent:$$SysName:Primary then "" else $Parent
+        type: text
+      - name: payslip_name
+        field: PaySlipName
+        type: text
+      - name: pay_type
+        field: if $$IsNotApplicable:$PayType then "" else $PayType
+        type: text
+      - name: income_type
+        field: if $$IsNotApplicable:$PayStatType then "" else $PayStatType
+        type: text
+      - name: calculation_type
+        field: CalculationType
+        type: text
+      - name: leave_type
+        field: LeaveType
+        type: text
+      - name: calculation_period
+        field: CalculationPeriod
+        type: text
 
-create table mst_cost_centre
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- category nvarchar(1024) not null default ''
-);
+  - name: mst_gst_effective_rate
+    collection: StockItem.GstDetails
+    nature: Derived
+    filters:
+      - NOT $$IsEmpty:$GstApplicable
+      - $$NumItems:GstDetails > 0
+    fields:
+      - name: item
+        field: Name
+        type: text
+      - name: item_guid
+        field: ..Guid
+        type: text
+      - name: applicable_from
+        field: Applicablefrom
+        type: date
+      - name: hsn_description
+        field: Hsn
+        type: text
+      - name: hsn_code
+        field: HsnCode
+        type: text
+      - name: rate
+        field: if NOT $$IsEmpty:$StateWiseDetails then $StateWiseDetails[First].RateDetails[3].GstRate else 0
+        type: number
+      - name: is_rcm_applicable
+        field: IsReverseChargeApplicable
+        type: logical
+      - name: nature_of_transaction
+        field: GstNatureOfTransaction
+        type: text
+      - name: nature_of_goods
+        field: NatureOfGoods
+        type: text
+      - name: supply_type
+        field: SupplyType
+        type: text
+      - name: taxability
+        field: Taxability
+        type: text
 
-create table mst_attendance_type
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- uom nvarchar(32) not null default '',
- _uom varchar(64) not null default '',
- attendance_type nvarchar(64) not null default '',
- attendance_period nvarchar(64) not null default ''
-);
+  - name: mst_opening_batch_allocation
+    collection: StockItem.BatchAllocations
+    nature: Derived
+    filters:
+      - $$NumItems:BatchAllocations > 0
+    fields:
+      - name: name
+        field: BatchName
+        type: text
+      - name: item
+        field: ..Name
+        type: text
+      - name: item_guid
+        field: ..Guid
+        type: text
+      - name: opening_balance
+        field: $$StringFindAndReplace:($$Number:$$String:$OpeningBalance):"(-)":"-"
+        type: amount
+      - name: opening_rate
+        field: OpeningRate
+        type: rate
+      - name: opening_value
+        field: OpeningValue
+        type: amount
+      - name: godown
+        field: GodownName
+        type: text
+      - name: godown_guid
+        field: $Guid:Godown:$GodownName
+        type: text
+      - name: manufactured_on
+        field: MfdOn
+        type: date
 
-create table mst_employee
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- id_number nvarchar(256) not null default '',
- date_of_joining date,
- date_of_release date,
- designation nvarchar(64) not null default '',
- function_role nvarchar(64) not null default '',
- location nvarchar(256) not null default '',
- gender nvarchar(32) not null default '',
- date_of_birth date,
- blood_group nvarchar(32) not null default '',
- father_mother_name nvarchar(256) not null default '',
- spouse_name nvarchar(256) not null default '',
- address nvarchar(256) not null default '',
- mobile nvarchar(32) not null default '',
- email nvarchar(64) not null default '',
- pan nvarchar(32) not null default '',
- aadhar nvarchar(32) not null default '',
- uan nvarchar(32) not null default '',
- pf_number nvarchar(32) not null default '',
- pf_joining_date date,
- pf_relieving_date date,
- pr_account_number nvarchar(32) not null default ''
-);
+  - name: mst_opening_bill_allocation
+    collection: Ledger.BillAllocations
+    nature: Derived
+    filters:
+      - $$NumItems:BillAllocations > 0
+    fields:
+      - name: ledger
+        field: ..Name
+        type: text
+      - name: ledger_guid
+        field: ..Guid
+        type: text
+      - name: opening_balance
+        field: OpeningBalance
+        type: amount
+      - name: bill_date
+        field: BillDate
+        type: date
+      - name: name
+        field: Name
+        type: text
+      - name: bill_credit_period
+        field: $$Number:$BillCreditPeriod
+        type: number
+      - name: is_advance
+        field: IsAdvance
+        type: logical
 
-create table mst_payhead
-(
- guid varchar(64) not null primary key,
- alterid int not null default 0,
- name nvarchar(1024) not null default '',
- parent nvarchar(1024) not null default '',
- _parent varchar(64) not null default '',
- payslip_name nvarchar(1024) not null default '',
- pay_type nvarchar(64) not null default '',
- income_type nvarchar(64) not null default '',
- calculation_type nvarchar(32) not null default '',
- leave_type nvarchar(64) not null default '',
- calculation_period nvarchar(32) not null default ''
-);
+  - name: trn_closingstock_ledger
+    collection: Ledger.LedgerClosingValues
+    nature: Derived
+    fetch:
+      - LedgerClosingValues
+    filters:
+      - $$IsLedOfGrp:$Name:$$GroupStock
+    fields:
+      - name: ledger
+        field: Name
+        type: text
+      - name: ledger_guid
+        field: ..Guid
+        type: text
+      - name: stock_date
+        field: Date
+        type: date
+      - name: stock_value
+        field: Amount
+        type: amount
 
-create table mst_gst_effective_rate
-(
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- applicable_from date,
- hsn_description nvarchar(256) not null default '',
- hsn_code nvarchar(64) not null default '',
- rate decimal(9,4) default 0,
- is_rcm_applicable tinyint,
- nature_of_transaction nvarchar(64) not null default '',
- nature_of_goods nvarchar(64) not null default '',
- supply_type nvarchar(64) not null default '',
- taxability nvarchar(64) not null default ''
-);
+  - name: mst_stockitem_standard_cost
+    collection: StockItem.StandardCostList
+    nature: Derived
+    fetch:
+      - StandardCostList
+    filters:
+      - $$NumItems:StandardCostList > 0
+    fields:
+      - name: item
+        field: Name
+        type: text
+      - name: item_guid
+        field: ..Guid
+        type: text
+      - name: date
+        field: Date
+        type: date
+      - name: rate
+        field: Rate
+        type: rate
 
-create table mst_opening_batch_allocation
-(
- name nvarchar(1024) not null default '',
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- opening_balance decimal(15,4) default 0,
- opening_rate decimal(15,4) default 0,
- opening_value decimal(17,2) default 0,
- godown nvarchar(1024) not null default '',
- _godown varchar(64) not null default '',
- manufactured_on date
-);
+  - name: mst_stockitem_standard_price
+    collection: StockItem.StandardPriceList
+    nature: Derived
+    fetch:
+      - StandardPriceList
+    filters:
+      - $$NumItems:StandardPriceList > 0
+    fields:
+      - name: item
+        field: Name
+        type: text
+      - name: item_guid
+        field: ..Guid
+        type: text
+      - name: date
+        field: Date
+        type: date
+      - name: rate
+        field: Rate
+        type: rate
 
-create table mst_opening_bill_allocation
-(
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- opening_balance decimal(17,4) default 0,
- bill_date date,
- name nvarchar(1024) not null default '',
- bill_credit_period int not null default 0,
- is_advance tinyint
-);
+transaction:
+  - name: trn_voucher
+    collection: Voucher
+    nature: Primary
+    fetch:
+      - AlterId,VoucherKey,Narration,PartyLedgerName,PlaceOfSupply,Reference,ReferenceDate
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: VoucherKey
+        type: number
+      - name: master_id
+        field: MasterId
+        type: number
+      - name: alter_id
+        field: AlterId
+        type: number
+      - name: alterid
+        field: AlterId
+        type: number
+      - name: date
+        field: Date
+        type: date
+      - name: voucher_type
+        field: VoucherTypeName
+        type: text
+      - name: voucher_number
+        field: VoucherNumber
+        type: text
+      - name: reference_number
+        field: Reference
+        type: text
+      - name: reference_date
+        field: ReferenceDate
+        type: date
+      - name: narration
+        field: Narration
+        type: text
+      - name: party_name
+        field: PartyLedgerName
+        type: text
+      - name: party_guid
+        field: if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName
+        type: text
+      - name: place_of_supply
+        field: PlaceOfSupply
+        type: text
+      - name: is_invoice
+        field: IsInvoice
+        type: logical
+      - name: is_accounting_voucher
+        field: if $$IsAccountingVch:$VoucherTypeName then 1 else 0
+        type: logical
+      - name: is_inventory_voucher
+        field: if $$IsInventoryVch:$VoucherTypeName then 1 else 0
+        type: logical
+      - name: is_order_voucher
+        field: if $$IsOrderVch:$VoucherTypeName then 1 else 0
+        type: logical
+    cascade_delete:
+      - table: trn_accounting
+        field: guid
+      - table: trn_inventory
+        field: guid
+      - table: trn_cost_centre
+        field: guid
+      - table: trn_cost_category_centre
+        field: guid
+      - table: trn_cost_inventory_category_centre
+        field: guid
+      - table: trn_bill
+        field: guid
+      - table: trn_bank
+        field: guid
+      - table: trn_batch
+        field: guid
+      - table: trn_inventory_accounting
+        field: guid
+      - table: trn_employee
+        field: guid
+      - table: trn_payhead
+        field: guid
+      - table: trn_attendance
+        field: guid
 
-create table trn_closingstock_ledger
-(
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- stock_date date,
- stock_value decimal(17,2) not null default 0
-);
+  - name: trn_accounting
+    collection: Voucher.AllLedgerEntries
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: line_no
+        field: if $$IsEmpty:$$LineIndex then 1 else $$LineIndex
+        type: number
+      - name: ledger
+        field: LedgerName
+        type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
+      - name: is_debit
+        field: if $$IsDebit:$Amount then 1 else 0
+        type: logical
+      - name: amount_forex
+        field: if $$IsEmpty:$$ForexValue:$Amount then 0 else $$StringFindAndReplace:(if $$IsDebit:$Amount then -$$ForexValue:$Amount else $$ForexValue:$Amount):"(-)":"-"
+        type: amount
+      - name: currency
+        field: $$Currency:$Amount
+        type: text
 
-create table mst_stockitem_standard_cost
-(
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- date date,
- rate decimal(15,4) default 0
-);
+  - name: trn_inventory
+    collection: Voucher.AllInventoryEntries
+    nature: Derived
+    fetch:
+      - AllInventoryEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllInventoryEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: line_no
+        field: if $$IsEmpty:$$LineIndex then 1 else $$LineIndex
+        type: number
+      - name: item
+        field: StockItemName
+        type: text
+      - name: item_guid
+        field: $Guid:StockItem:$StockItemName
+        type: text
+      - name: quantity
+        field: ActualQty
+        type: quantity
+      - name: billed_quantity
+        field: BilledQty
+        type: quantity
+      - name: unit
+        field: $UOM
+        type: text
+      - name: rate
+        field: Rate
+        type: rate
+      - name: gross_rate
+        field: BasicRateOfInvoice
+        type: rate
+      - name: amount
+        field: Amount
+        type: amount
+      - name: additional_amount
+        field: AddlAmount
+        type: amount
+      - name: discount_amount
+        field: Discount
+        type: number
+      - name: discount_percent
+        field: Discount
+        type: number
+      - name: godown
+        field: GodownName
+        type: text
+      - name: godown_guid
+        field: $Guid:Godown:$GodownName
+        type: text
+      - name: tracking_number
+        field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
+        type: text
+      - name: order_number
+        field: if ($$IsEmpty:$OrderNo or $$IsNotApplicable:$OrderNo) then "" else $OrderNo
+        type: text
+      - name: order_duedate
+        field: OrderDueDate
+        type: date
 
-create table mst_stockitem_standard_price
-(
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- date date,
- rate decimal(15,4) default 0
-);
+  - name: trn_cost_centre
+    collection: Voucher.AllLedgerEntries.CostCentreAllocations
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: ledger
+        field: LedgerName
+        type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
+      - name: costcentre
+        field: Name
+        type: text
+      - name: costcentre_guid
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
 
-create table trn_voucher
-(
- guid varchar(64) not null primary key,
- master_id int not null default 0,
- alterid int not null default 0,
- voucher_key int not null default 0,
- date date not null,
- voucher_type nvarchar(1024) not null,
- _voucher_type varchar(64) not null default '',
- voucher_number nvarchar(64) not null default '',
- reference_number nvarchar(64) not null default '',
- reference_date date,
- narration nvarchar(4000) not null default '',
- party_name nvarchar(256) not null,
- _party_name varchar(64) not null default '',
- place_of_supply nvarchar(256) not null,
- is_invoice tinyint,
- is_accounting_voucher tinyint,
- is_inventory_voucher tinyint,
- is_order_voucher tinyint
-);
+  - name: trn_cost_category_centre
+    collection: Voucher.AllLedgerEntries.CategoryAllocations.CostCentreAllocations
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: costcategory
+        field: Category
+        type: text
+      - name: costcategory_guid
+        field: $Guid:CostCategory:$Category
+        type: text
+      - name: costcentre
+        field: Name
+        type: text
+      - name: costcentre_guid
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
 
-create table trn_accounting
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- amount decimal(17,2) not null default 0,
- is_debit tinyint,
- amount_forex decimal(17,2) not null default 0,
- currency nvarchar(16) not null default ''
-);
+  - name: trn_cost_inventory_category_centre
+    collection: Voucher.AllLedgerEntries.InventoryAllocations.CategoryAllocations.CostCentreAllocations
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: ledger
+        field: LedgerName
+        type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
+      - name: item
+        field: StockItemName
+        type: text
+      - name: item_guid
+        field: $Guid:StockItem:$StockItemName
+        type: text
+      - name: costcategory
+        field: Category
+        type: text
+      - name: costcategory_guid
+        field: $Guid:CostCategory:$Category
+        type: text
+      - name: costcentre
+        field: Name
+        type: text
+      - name: costcentre_guid
+        field: $Guid:CostCentre:$Name
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
 
-create table trn_inventory
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- quantity decimal(15,4) not null default 0,
- billed_quantity decimal(15,4) not null default 0,
- unit nvarchar(32) not null default '',
- rate decimal(15,4) not null default 0,
- gross_rate decimal(15,4) not null default 0,
- amount decimal(17,2) not null default 0,
- additional_amount decimal(17,2) not null default 0,
- discount_amount decimal(17,2) not null default 0,
- discount_percent decimal(15,4) not null default 0,
- godown nvarchar(1024),
- _godown varchar(64) not null default '',
- tracking_number nvarchar(256),
- order_number nvarchar(256),
- order_duedate date
-);
+  - name: trn_bill
+    collection: Voucher.AllLedgerEntries.BillAllocations
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: name
+        field: Name
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
+      - name: billtype
+        field: BillType
+        type: text
+      - name: bill_credit_period
+        field: $$Number:$BillCreditPeriod
+        type: number
+      - name: due_date
+        field: DueDate
+        type: date
+      - name: is_advance
+        field: IsAdvance
+        type: logical
 
-create table trn_cost_centre
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- costcentre nvarchar(1024) not null default '',
- _costcentre varchar(64) not null default '',
- amount decimal(17,2) not null default 0
-);
+  - name: trn_bank
+    collection: Voucher.AllLedgerEntries.BankAllocations
+    nature: Derived
+    fetch:
+      - AllLedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllLedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: transaction_type
+        field: TransactionType
+        type: text
+      - name: instrument_date
+        field: InstrumentDate
+        type: date
+      - name: instrument_number
+        field: InstrumentNumber
+        type: text
+      - name: bank_name
+        field: BankName
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
+      - name: bankers_date
+        field: BankersDate
+        type: date
 
-create table trn_cost_category_centre
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- costcategory nvarchar(1024) not null default '',
- _costcategory varchar(64) not null default '',
- costcentre nvarchar(1024) not null default '',
- _costcentre varchar(64) not null default '',
- amount decimal(17,2) not null default 0
-);
+  - name: trn_batch
+    collection: Voucher.AllInventoryEntries.BatchAllocations
+    nature: Derived
+    fetch:
+      - AllInventoryEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AllInventoryEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: item
+        field: StockItemName
+        type: text
+      - name: item_guid
+        field: $Guid:StockItem:$StockItemName
+        type: text
+      - name: name
+        field: BatchName
+        type: text
+      - name: quantity
+        field: ActualQty
+        type: quantity
+      - name: amount
+        field: Amount
+        type: amount
+      - name: godown
+        field: GodownName
+        type: text
+      - name: godown_guid
+        field: $Guid:Godown:$GodownName
+        type: text
+      - name: destination_godown
+        field: DestinationGodownName
+        type: text
+      - name: destination_godown_guid
+        field: if $$IsEmpty:$DestinationGodownName then "" else $Guid:Godown:$DestinationGodownName
+        type: text
+      - name: tracking_number
+        field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
+        type: text
 
-create table trn_cost_inventory_category_centre
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- costcategory nvarchar(1024) not null default '',
- _costcategory varchar(64) not null default '',
- costcentre nvarchar(1024) not null default '',
- _costcentre varchar(64) not null default '',
- amount decimal(17,2) not null default 0
-);
+  - name: trn_inventory_accounting
+    collection: Voucher.LedgerEntries
+    nature: Derived
+    fetch:
+      - LedgerEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:LedgerEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: ledger
+        field: LedgerName
+        type: text
+      - name: ledger_guid
+        field: $Guid:Ledger:$LedgerName
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
+      - name: additional_allocation_type
+        field: AddlAllocType
+        type: text
 
-create table trn_bill
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- name nvarchar(1024) not null default '',
- amount decimal(17,2) not null default 0,
- billtype nvarchar(256) not null default '',
- bill_credit_period int not null default 0,
- due_date date,
- is_advance tinyint
-);
+  - name: trn_employee
+    collection: Voucher.CategoryEntry.EmployeeEntry
+    nature: Derived
+    fetch:
+      - CategoryEntry
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:CategoryEntry > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: category
+        field: Category
+        type: text
+      - name: employee_name
+        field: EmployeeName
+        type: text
+      - name: amount
+        field: Amount
+        type: amount
+      - name: employee_sort_order
+        field: EmployeeSortOrder
+        type: number
 
-create table trn_bank
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- transaction_type nvarchar(32) not null default '',
- instrument_date date,
- instrument_number nvarchar(1024) not null default '',
- bank_name nvarchar(64) not null default '',
- amount decimal(17,2) not null default 0,
- bankers_date date
-);
+  - name: trn_payhead
+    collection: Voucher.CategoryEntry.EmployeeEntry.PayheadAllocations
+    nature: Derived
+    fetch:
+      - CategoryEntry
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:CategoryEntry > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: category
+        field: Category
+        type: text
+      - name: employee_name
+        field: EmployeeName
+        type: text
+      - name: employee_sort_order
+        field: EmployeeSortOrder
+        type: number
+      - name: payhead_name
+        field: PayheadName
+        type: text
+      - name: payhead_sort_order
+        field: PayheadSortOrder
+        type: number
+      - name: amount
+        field: Amount
+        type: amount
 
-create table trn_batch
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- item nvarchar(1024) not null default '',
- _item varchar(64) not null default '',
- name nvarchar(1024) not null default '',
- quantity decimal(15,4) not null default 0,
- amount decimal(17,2) not null default 0,
- godown nvarchar(1024),
- _godown varchar(64) not null default '',
- destination_godown nvarchar(1024),
- _destination_godown varchar(64) not null default '',
- tracking_number nvarchar(1024)
-);
-
-create table trn_inventory_accounting
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- ledger nvarchar(1024) not null default '',
- _ledger varchar(64) not null default '',
- amount decimal(17,2) not null default 0,
- additional_allocation_type nvarchar(32) not null default ''
-);
-
-create table trn_employee
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- category nvarchar(1024) not null default '',
- _category varchar(64) not null default '',
- employee_name nvarchar(1024) not null default '',
- _employee_name varchar(64) not null default '',
- amount decimal(17,2) not null default 0,
- employee_sort_order int not null default 0
-);
-
-create table trn_payhead
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- category nvarchar(1024) not null default '',
- _category varchar(64) not null default '',
- employee_name nvarchar(1024) not null default '',
- _employee_name varchar(64) not null default '',
- employee_sort_order int not null default 0,
- payhead_name nvarchar(1024) not null default '',
- _payhead_name varchar(64) not null default '',
- payhead_sort_order int not null default 0,
- amount decimal(17,2) not null default 0
-);
-
-create table trn_attendance
-(
- guid varchar(64) not null default '',
- voucher_key int not null default 0,
- employee_name nvarchar(1024) not null default '',
- _employee_name varchar(64) not null default '',
- attendancetype_name nvarchar(1024) not null default '',
- _attendancetype_name varchar(64) not null default '',
- time_value decimal(17,2) not null default 0,
- type_value decimal(17,2) not null default 0
-);
+  - name: trn_attendance
+    collection: Voucher.AttendanceEntries
+    nature: Derived
+    fetch:
+      - AttendanceEntries
+    filters:
+      - NOT $IsCancelled
+      - NOT $IsOptional
+      - $$NumItems:AttendanceEntries > 0
+    fields:
+      - name: guid
+        field: Guid
+        type: text
+      - name: voucher_key
+        field: ..VoucherKey
+        type: number
+      - name: voucher_guid
+        field: ..Guid
+        type: text
+      - name: voucher_alter_id
+        field: ..AlterId
+        type: number
+      - name: voucher_type
+        field: ..VoucherTypeName
+        type: text
+      - name: voucher_date
+        field: ..Date
+        type: date
+      - name: employee_name
+        field: Name
+        type: text
+      - name: attendancetype_name
+        field: AttendanceType
+        type: text
+      - name: time_value
+        field: AttdTypeTimeValue
+        type: amount
+      - name: type_value
+        field: AttdTypeValue
+        type: quantity
