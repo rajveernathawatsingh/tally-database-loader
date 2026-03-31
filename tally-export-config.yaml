@@ -995,3 +995,147 @@ transaction:
         - name: type_value
           field: AttdTypeValue
           type: quantity
+    - name: trn_purchase_order
+      collection: Voucher.AllInventoryEntries
+      nature: Derived
+      fetch:
+        - AllInventoryEntries
+      filters:
+        - NOT $IsCancelled
+        - NOT $IsOptional
+        - $$IsOrderVch:$VoucherTypeName
+        - $VoucherTypeName = "Purchase Order"
+        - $$NumItems:AllInventoryEntries > 0
+      fields:
+        - name: guid
+          field: Guid
+          type: text
+        - name: voucher_key
+          field: ..VoucherKey
+          type: number
+        - name: voucher_guid
+          field: ..Guid
+          type: text
+        - name: voucher_alter_id
+          field: ..AlterId
+          type: number
+        - name: voucher_date
+          field: ..Date
+          type: date
+        - name: voucher_number
+          field: ..VoucherNumber
+          type: text
+        - name: party_name
+          field: ..PartyLedgerName
+          type: text
+        - name: party_guid
+          field: if $$IsEmpty:$..PartyLedgerName then "" else $Guid:Ledger:$..PartyLedgerName
+          type: text
+        - name: narration
+          field: ..Narration
+          type: text
+        - name: line_no
+          field: $$LineIndex
+          type: number
+        - name: item
+          field: StockItemName
+          type: text
+        - name: item_guid
+          field: $Guid:StockItem:$StockItemName
+          type: text
+        - name: quantity
+          field: ActualQty
+          type: quantity
+        - name: unit
+          field: $UOM
+          type: text
+        - name: rate
+          field: Rate
+          type: rate
+        - name: amount
+          field: Amount
+          type: amount
+        - name: order_duedate
+          field: OrderDueDate
+          type: date
+        - name: godown
+          field: GodownName
+          type: text
+        - name: godown_guid
+          field: $Guid:Godown:$GodownName
+          type: text
+        - name: tracking_number
+          field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
+          type: text
+    - name: trn_sales_order
+      collection: Voucher.AllInventoryEntries
+      nature: Derived
+      fetch:
+        - AllInventoryEntries
+      filters:
+        - NOT $IsCancelled
+        - NOT $IsOptional
+        - $$IsOrderVch:$VoucherTypeName
+        - $VoucherTypeName = "Sales Order"
+        - $$NumItems:AllInventoryEntries > 0
+      fields:
+        - name: guid
+          field: Guid
+          type: text
+        - name: voucher_key
+          field: ..VoucherKey
+          type: number
+        - name: voucher_guid
+          field: ..Guid
+          type: text
+        - name: voucher_alter_id
+          field: ..AlterId
+          type: number
+        - name: voucher_date
+          field: ..Date
+          type: date
+        - name: voucher_number
+          field: ..VoucherNumber
+          type: text
+        - name: party_name
+          field: ..PartyLedgerName
+          type: text
+        - name: party_guid
+          field: if $$IsEmpty:$..PartyLedgerName then "" else $Guid:Ledger:$..PartyLedgerName
+          type: text
+        - name: narration
+          field: ..Narration
+          type: text
+        - name: line_no
+          field: $$LineIndex
+          type: number
+        - name: item
+          field: StockItemName
+          type: text
+        - name: item_guid
+          field: $Guid:StockItem:$StockItemName
+          type: text
+        - name: quantity
+          field: ActualQty
+          type: quantity
+        - name: unit
+          field: $UOM
+          type: text
+        - name: rate
+          field: Rate
+          type: rate
+        - name: amount
+          field: Amount
+          type: amount
+        - name: order_duedate
+          field: OrderDueDate
+          type: date
+        - name: godown
+          field: GodownName
+          type: text
+        - name: godown_guid
+          field: $Guid:Godown:$GodownName
+          type: text
+        - name: tracking_number
+          field: if ($$IsEmpty:$TrackingNumber or $$IsNotApplicable:$TrackingNumber) then "" else $TrackingNumber
+          type: text
