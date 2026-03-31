@@ -209,6 +209,10 @@ class _tally {
                         //terminate sync if nothing has changed
                         if (!flgIsMasterChanged && !flgIsTransactionChanged) {
                             logger.logMessage('  No change found');
+                            await database.commitTransaction();
+                            if (this.currentSyncLogId) {
+                                await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdFrom, {});
+                            }
                             return resolve();
                         }
 
