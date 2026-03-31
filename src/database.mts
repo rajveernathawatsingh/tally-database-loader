@@ -407,9 +407,12 @@ class _database {
         if (!this.pgTransactionClient) {
             throw new Error('No transaction in progress');
         }
-        await this.pgTransactionClient.query('COMMIT');
-        this.pgTransactionClient.release();
-        this.pgTransactionClient = null;
+        try {
+            await this.pgTransactionClient.query('COMMIT');
+        } finally {
+            this.pgTransactionClient.release();
+            this.pgTransactionClient = null;
+        }
         const counts = { ...this.pgTransactionRowCounts };
         this.pgTransactionRowCounts = {};
         return counts;
@@ -676,7 +679,8 @@ class _database {
 
     private executePostgres(sqlQuery: string | string[]): Promise<queryResult> {
         return new Promise<queryResult>(async (resolve, reject) => {
-            let connection = await this.connectionPoolPostgres.connect();
+            const connection = this.pgTransactionClient ?? await this.connectionPoolPostgres.connect();
+            const releaseAfter = !this.pgTransactionClient;
             try {
                 let rowCount = 0;
                 let data: any[] = [];
@@ -699,7 +703,7 @@ class _database {
                 reject(err);
                 logger.logError('database.executePostgres()', err);
             } finally {
-                connection.release();
+                if (releaseAfter) connection.release();
             }
         });
     }
