@@ -24,6 +24,8 @@ class _tally {
     private lstDatabaseTableDefinitionJson: tableConfigJSON[] = [];
     private lstCollectionDataCache: Map<string, any[]> = new Map<string, any[]>();
 
+    private currentSyncLogId: number | null = null;
+
     //hidden commandline flags
     private importMaster = true;
     private importTransaction = true;
@@ -113,6 +115,19 @@ class _tally {
                 }
 
                 await database.openConnectionPool();
+
+                // Determine sync type and alter_id cursor (before transaction)
+                const syncType = this.config.sync === 'incremental' ? 'incremental' : 'full';
+                const alterIdFrom: number = syncType === 'incremental'
+                    ? (await database.executeScalar<number>(
+                          `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
+                      ) ?? 0)
+                    : 0;
+
+                this.currentSyncLogId = await this.writeSyncLogStart(syncType, alterIdFrom);
+
+                try {
+                    await database.beginTransaction();
 
                 if (this.config.sync == 'incremental') {
 
@@ -618,6 +633,24 @@ class _tally {
 
                     } else;
                 }
+
+                    // After all tables complete, get max alter_id from trn_voucher
+                    const alterIdTo: number = await database.executeScalar<number>(
+                        `SELECT coalesce(max(alter_id), 0) FROM trn_voucher`
+                    ) ?? 0;
+
+                    const rowCounts = await database.commitTransaction();
+                    await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdTo, rowCounts);
+
+                } catch (innerErr: unknown) {
+                    await database.rollbackTransaction();
+                    const msg = innerErr instanceof Error ? innerErr.message : String(innerErr);
+                    if (this.currentSyncLogId) {
+                        await this.writeSyncLogEnd(this.currentSyncLogId, 'failed', 0, {}, msg);
+                    }
+                    throw innerErr;
+                }
+
                 resolve();
             } catch (err) {
                 logger.logError('tally.importData()', err);
@@ -626,6 +659,51 @@ class _tally {
                 await database.closeConnectionPool();
             }
         });
+    }
+
+    private async writeSyncLogStart(syncType: 'full' | 'incremental', alterIdFrom: number): Promise<number> {
+        const result = await database.executeScalar<number>(
+            `INSERT INTO sync_log (sync_type, alter_id_from, status)
+             VALUES ('${syncType}', ${alterIdFrom}, 'running')
+             RETURNING id`
+        );
+        return result ?? 0;
+    }
+
+    private async writeSyncLogEnd(
+        id: number,
+        status: 'success' | 'failed',
+        alterIdTo: number,
+        rowCounts: Record<string, number>,
+        errorMessage?: string
+    ): Promise<void> {
+        const rowCountsJson = JSON.stringify(rowCounts).replace(/'/g, "''");
+        const errorClause = errorMessage
+            ? `, error_message = '${errorMessage.replace(/'/g, "''").substring(0, 1000)}'`
+            : '';
+        await database.executeNonQuery(
+            `UPDATE sync_log
+             SET status = '${status}',
+                 completed_at = now(),
+                 alter_id_to = ${alterIdTo},
+                 rows_upserted = '${rowCountsJson}'::jsonb
+                 ${errorClause}
+             WHERE id = ${id}`
+        );
+    }
+
+    async getCurrentTransactionAlterId(): Promise<number> {
+        // updateLastAlterId() fetches $AltVchId from Tally and sets this.lastAlterIdTransaction
+        await this.updateLastAlterId();
+        // Use the instance variable set by updateLastAlterId() directly
+        if (this.lastAlterIdTransaction > 0) {
+            return this.lastAlterIdTransaction;
+        }
+        // Fallback: read from config table (populated by saveCompanyInfo)
+        const result = await database.executeScalar<number>(
+            `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
+        );
+        return result ?? 0;
     }
 
     updateLastAlterId(): Promise<void> {
