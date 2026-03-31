@@ -133,7 +133,7 @@ class _tally {
 
                     if (this.isDefinitionYAML == false) {
                         logger.logMessage('Incremental Sync is supported only for YAML based definition');
-                        return reject();
+                        throw new Error('Incremental Sync is supported only for YAML based definition');
                     }
 
                     if (/^(mssql|mysql|postgres)$/g.test(database.config.technology)) {
@@ -388,7 +388,7 @@ class _tally {
                     let lstCompanies: companyInfo[] = await this.fetchTallyCompanyList();
                     if (!lstCompanies.length) {
                         logger.logMessage('Not a single company is open in Tally');
-                        return reject();
+                        throw new Error('Not a single company is open in Tally');
                     } else {
                         //activate target company
                         if (this.config.company) {
@@ -397,7 +397,7 @@ class _tally {
                                 await this.setTallyTargetCompany(this.config.company); // make the company active
                             } else {
                                 logger.logMessage(`Specified company "${this.config.company}" does not exists / open in Tally`);
-                                return reject();
+                                throw new Error(`Specified company "${this.config.company}" does not exists / open in Tally`);
                             }
                         } else { // default to active company
                             this.config.company = lstCompanies[0]?.name || '';
@@ -412,7 +412,7 @@ class _tally {
 
                             if (!this.periodFromDate || !this.periodToDate || this.periodFromDate > this.periodToDate) {
                                 logger.logMessage('Invalid from / to date specified');
-                                return reject();
+                                throw new Error('Invalid from / to date specified');
                             } else {
                                 await this.setTallyTargetPeriod(this.periodFromDate, this.periodToDate);
                             }
@@ -640,7 +640,9 @@ class _tally {
                     ) ?? 0;
 
                     const rowCounts = await database.commitTransaction();
-                    await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdTo, rowCounts);
+                    if (this.currentSyncLogId) {
+                        await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdTo, rowCounts);
+                    }
 
                 } catch (innerErr: unknown) {
                     await database.rollbackTransaction();
