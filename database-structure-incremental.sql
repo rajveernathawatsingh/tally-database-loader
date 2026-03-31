@@ -1,543 +1,468 @@
--- Updated schema aligned with the incremental YAML (GUID joins, voucher context, no nested formulas)
--- Notes:
--- - Keeps both alter_id and alterid to satisfy loader queries that reference t.alterid.
--- - Adds GUID columns for joins on derived/opening tables.
--- - Adds voucher context columns on line tables (voucher_guid, voucher_alter_id, voucher_type, voucher_date, line_no where applicable).
-
 create table _diff
 (
-  guid varchar(64) not null,
-  alterid int not null
+ guid varchar(64) not null,
+ alterid int
 );
 
 create table _delete
 (
-  guid varchar(64) not null
+ guid varchar(64) not null
 );
 
 create table _vchnumber
 (
-  guid varchar(64) not null,
-  voucher_number varchar(256) not null
+ guid varchar(64) not null,
+ voucher_number varchar(256)
 );
 
 create table config
 (
-  name nvarchar(64) not null primary key,
-  value nvarchar(1024)
+ name nvarchar(64) not null primary key,
+ value nvarchar(1024)
 );
 
 create table mst_group
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  primary_group nvarchar(1024) not null default '',
-  is_revenue tinyint,
-  is_deemedpositive tinyint,
-  is_reserved tinyint,
-  affects_gross_profit tinyint,
-  sort_position int,
-  group_level int not null default 0
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ primary_group nvarchar(1024),
+ is_revenue tinyint,
+ is_deemedpositive tinyint,
+ is_reserved tinyint,
+ affects_gross_profit tinyint,
+ sort_position int
 );
 
 create table mst_ledger
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  group_name nvarchar(1024) not null default '',
-  primary_group nvarchar(1024) not null default '',
-  alias nvarchar(256) not null default '',
-  description nvarchar(64) not null default '',
-  notes nvarchar(64) not null default '',
-  is_revenue tinyint,
-  is_deemedpositive tinyint,
-  opening_balance decimal(17,2) default 0,
-  closing_balance decimal(17,2) default 0,
-  mailing_name nvarchar(256) not null default '',
-  mailing_address nvarchar(1024) not null default '',
-  mailing_state nvarchar(256) not null default '',
-  mailing_country nvarchar(256) not null default '',
-  mailing_pincode nvarchar(64) not null default '',
-  email nvarchar(256) not null default '',
-  it_pan nvarchar(64) not null default '',
-  gstn nvarchar(64) not null default '',
-  gst_registration_type nvarchar(64) not null default '',
-  gst_supply_type nvarchar(64) not null default '',
-  gst_duty_head nvarchar(16) not null default '',
-  tax_rate decimal(9,4) default 0,
-  bank_account_holder nvarchar(256) not null default '',
-  bank_account_number nvarchar(64) not null default '',
-  bank_ifsc nvarchar(64) not null default '',
-  bank_swift nvarchar(64) not null default '',
-  bank_name nvarchar(64) not null default '',
-  bank_branch nvarchar(64) not null default '',
-  bill_credit_period int not null default 0,
-  maintain_billwise tinyint
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ alias nvarchar(256),
+ description nvarchar(64),
+ notes nvarchar(64),
+ is_revenue tinyint,
+ is_deemedpositive tinyint,
+ opening_balance decimal(17,2),
+ closing_balance decimal(17,2),
+ mailing_name nvarchar(256),
+ mailing_address nvarchar(1024),
+ mailing_state nvarchar(256),
+ mailing_country nvarchar(256),
+ mailing_pincode nvarchar(64),
+ email nvarchar(256),
+ mobile nvarchar(32),
+ it_pan nvarchar(64),
+ gstn nvarchar(64),
+ gst_registration_type nvarchar(64),
+ gst_supply_type nvarchar(64),
+ gst_duty_head nvarchar(16),
+ tax_rate decimal(9,4),
+ bank_account_holder nvarchar(256),
+ bank_account_number nvarchar(64),
+ bank_ifsc nvarchar(64),
+ bank_swift nvarchar(64),
+ bank_name nvarchar(64),
+ bank_branch nvarchar(64),
+ bill_credit_period int
 );
 
 create table mst_vouchertype
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  numbering_method nvarchar(64) not null default '',
-  is_deemedpositive tinyint,
-  affects_stock tinyint
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ numbering_method nvarchar(64),
+ is_deemedpositive tinyint,
+ affects_stock tinyint
 );
 
 create table mst_uom
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  formalname nvarchar(256) not null default '',
-  is_simple_unit tinyint not null,
-  base_units nvarchar(1024) not null,
-  additional_units nvarchar(1024) not null,
-  conversion int not null
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ formalname nvarchar(256),
+ is_simple_unit tinyint,
+ base_units nvarchar(1024),
+ additional_units nvarchar(1024),
+ conversion decimal(15,4)
 );
 
 create table mst_godown
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  address nvarchar(1024) not null default '',
-  parent_guid varchar(64) not null default ''
-);
-
-create table mst_stock_group
-(
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ address nvarchar(1024)
 );
 
 create table mst_stock_category
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64)
+);
+
+create table mst_stock_group
+(
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64)
 );
 
 create table mst_stock_item
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  stock_category nvarchar(1024) not null default '',
-  stock_category_guid varchar(64) not null default '',
-  alias nvarchar(256) not null default '',
-  description nvarchar(64) not null default '',
-  notes nvarchar(64) not null default '',
-  part_number nvarchar(256) not null default '',
-  uom nvarchar(32) not null default '',
-  alternate_uom nvarchar(32) not null default '',
-  conversion int not null default 0,
-  opening_balance decimal(15,4) default 0,
-  opening_rate decimal(15,4) default 0,
-  opening_value decimal(17,2) default 0,
-  closing_balance decimal(15,4) default 0,
-  closing_rate decimal(15,4) default 0,
-  closing_value decimal(17,2) default 0,
-  costing_method nvarchar(32) not null default '',
-  gst_type_of_supply nvarchar(32) default '',
-  gst_hsn_code nvarchar(64) default '',
-  gst_hsn_description nvarchar(256) default '',
-  gst_rate decimal(9,4) default 0,
-  gst_taxability nvarchar(32) default '',
-  is_batchwise_on tinyint,
-  is_serial_no_on tinyint
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ category nvarchar(1024),
+ _category varchar(64),
+ alias nvarchar(256),
+ description nvarchar(64),
+ notes nvarchar(64),
+ part_number nvarchar(256),
+ uom nvarchar(32),
+ _uom varchar(64),
+ alternate_uom nvarchar(32),
+ _alternate_uom varchar(64),
+ conversion decimal(15,4),
+ opening_balance decimal(15,4),
+ opening_rate decimal(15,4),
+ opening_value decimal(17,2),
+ closing_balance decimal(15,4),
+ closing_rate decimal(15,4),
+ closing_value decimal(17,2),
+ costing_method nvarchar(32),
+ gst_type_of_supply nvarchar(32),
+ gst_hsn_code nvarchar(64),
+ gst_hsn_description nvarchar(256),
+ gst_rate decimal(9,4),
+ gst_taxability nvarchar(32)
 );
 
 create table mst_cost_category
 (
-  guid varchar(64) not null primary key,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  allocate_revenue tinyint,
-  allocate_non_revenue tinyint
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ allocate_revenue tinyint,
+ allocate_non_revenue tinyint
 );
 
 create table mst_cost_centre
 (
-  guid varchar(64) not null primary key,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  category nvarchar(1024) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ category nvarchar(1024)
 );
 
 create table mst_attendance_type
 (
-  guid varchar(64) not null primary key,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  uom nvarchar(32) not null default '',
-  attendance_type nvarchar(64) not null default '',
-  attendance_period nvarchar(64) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ uom nvarchar(32),
+ _uom varchar(64),
+ attendance_type nvarchar(64),
+ attendance_period nvarchar(64)
 );
 
 create table mst_employee
 (
-  guid varchar(64) not null primary key,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  id_number nvarchar(256) not null default '',
-  date_of_joining date,
-  date_of_release date,
-  designation nvarchar(64) not null default '',
-  function_role nvarchar(64) not null default '',
-  location nvarchar(256) not null default '',
-  gender nvarchar(32) not null default '',
-  date_of_birth date,
-  blood_group nvarchar(32) not null default '',
-  father_mother_name nvarchar(256) not null default '',
-  spouse_name nvarchar(256) not null default '',
-  address nvarchar(256) not null default '',
-  mobile nvarchar(32) not null default '',
-  email nvarchar(64) not null default '',
-  pan nvarchar(32) not null default '',
-  aadhar nvarchar(32) not null default '',
-  uan nvarchar(32) not null default '',
-  pf_number nvarchar(32) not null default '',
-  pf_joining_date date,
-  pf_relieving_date date,
-  pr_account_number nvarchar(32) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ id_number nvarchar(256),
+ date_of_joining date,
+ date_of_release date,
+ designation nvarchar(64),
+ function_role nvarchar(64),
+ location nvarchar(256),
+ gender nvarchar(32),
+ date_of_birth date,
+ blood_group nvarchar(32),
+ father_mother_name nvarchar(256),
+ spouse_name nvarchar(256),
+ address nvarchar(256),
+ mobile nvarchar(32),
+ email nvarchar(64),
+ pan nvarchar(32),
+ aadhar nvarchar(32),
+ uan nvarchar(32),
+ pf_number nvarchar(32),
+ pf_joining_date date,
+ pf_relieving_date date,
+ pr_account_number nvarchar(32)
 );
 
 create table mst_payhead
 (
-  guid varchar(64) not null primary key,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  name nvarchar(1024) not null default '',
-  parent nvarchar(1024) not null default '',
-  payslip_name nvarchar(1024) not null default '',
-  pay_type nvarchar(64) not null default '',
-  income_type nvarchar(64) not null default '',
-  calculation_type nvarchar(32) not null default '',
-  leave_type nvarchar(64) not null default '',
-  calculation_period nvarchar(32) not null default ''
+ guid varchar(64) not null primary key,
+ alterid int,
+ name nvarchar(1024),
+ parent nvarchar(1024),
+ _parent varchar(64),
+ payslip_name nvarchar(1024),
+ pay_type nvarchar(64),
+ income_type nvarchar(64),
+ calculation_type nvarchar(32),
+ leave_type nvarchar(64),
+ calculation_period nvarchar(32)
 );
 
 create table mst_gst_effective_rate
 (
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  applicable_from date,
-  hsn_description nvarchar(256) not null default '',
-  hsn_code nvarchar(64) not null default '',
-  rate decimal(9,4) default 0,
-  is_rcm_applicable tinyint,
-  nature_of_transaction nvarchar(64) not null default '',
-  nature_of_goods nvarchar(64) not null default '',
-  supply_type nvarchar(64) not null default '',
-  taxability nvarchar(64) not null default ''
+ item nvarchar(1024),
+ _item varchar(64),
+ applicable_from date,
+ hsn_description nvarchar(256),
+ hsn_code nvarchar(64),
+ duty_head nvarchar(64),
+ rate decimal(9,4),
+ rate_per_unit decimal(9,4),
+ valuation_type nvarchar(64),
+ is_rcm_applicable tinyint,
+ nature_of_transaction nvarchar(64),
+ nature_of_goods nvarchar(64),
+ supply_type nvarchar(64),
+ taxability nvarchar(64)
 );
 
 create table mst_opening_batch_allocation
 (
-  name nvarchar(1024) not null default '',
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  opening_balance decimal(15,4) default 0,
-  opening_rate decimal(15,4) default 0,
-  opening_value decimal(17,2) default 0,
-  godown nvarchar(1024) not null default '',
-  godown_guid varchar(64) not null default '',
-  manufactured_on date
+ name nvarchar(1024),
+ item nvarchar(1024),
+ _item varchar(64),
+ opening_balance decimal(15,4),
+ opening_rate decimal(15,4),
+ opening_value decimal(17,2),
+ godown nvarchar(1024),
+ _godown varchar(64),
+ manufactured_on date
 );
 
 create table mst_opening_bill_allocation
 (
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  opening_balance decimal(17,4) default 0,
-  bill_date date,
-  name nvarchar(1024) not null default '',
-  bill_credit_period int not null default 0,
-  is_advance tinyint
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ opening_balance decimal(17,4),
+ bill_date date,
+ name nvarchar(1024),
+ bill_credit_period int,
+ is_advance tinyint
 );
 
 create table trn_closingstock_ledger
 (
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  stock_date date,
-  stock_value decimal(17,2) not null default 0
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ stock_date date,
+ stock_value decimal(17,2)
 );
 
 create table mst_stockitem_standard_cost
 (
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  date date,
-  rate decimal(15,4) default 0
+ item nvarchar(1024),
+ _item varchar(64),
+ date date,
+ rate decimal(15,4)
 );
 
 create table mst_stockitem_standard_price
 (
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  date date,
-  rate decimal(15,4) default 0
+ item nvarchar(1024),
+ _item varchar(64),
+ date date,
+ rate decimal(15,4)
 );
 
 create table trn_voucher
 (
-  guid varchar(64) not null primary key,
-  master_id int not null default 0,
-  alter_id int not null default 0,
-  alterid int not null default 0,
-  voucher_key int not null default 0,
-  date date not null,
-  voucher_type nvarchar(1024) not null,
-  voucher_number nvarchar(64) not null default '',
-  reference_number nvarchar(64) not null default '',
-  reference_date date,
-  narration nvarchar(4000) not null default '',
-  party_name nvarchar(256) not null,
-  party_guid varchar(64) not null default '',
-  place_of_supply nvarchar(256) not null,
-  is_invoice tinyint,
-  is_accounting_voucher tinyint,
-  is_inventory_voucher tinyint,
-  is_order_voucher tinyint
+ guid varchar(64) not null primary key,
+ alterid int,
+ date date,
+ voucher_type nvarchar(1024),
+ _voucher_type varchar(64),
+ voucher_number nvarchar(64),
+ reference_number nvarchar(64),
+ reference_date date,
+ narration nvarchar(4000),
+ party_name nvarchar(256),
+ _party_name varchar(64),
+ place_of_supply nvarchar(256),
+ is_invoice tinyint,
+ is_accounting_voucher tinyint,
+ is_inventory_voucher tinyint,
+ is_order_voucher tinyint
 );
 
 create table trn_accounting
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  line_no int not null default 0,
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  amount decimal(17,2) not null default 0,
-  is_debit tinyint,
-  amount_forex decimal(17,2) not null default 0,
-  currency nvarchar(16) not null default ''
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ amount decimal(17,2),
+ amount_forex decimal(17,2),
+ currency nvarchar(16)
 );
 
 create table trn_inventory
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  line_no int not null default 0,
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  quantity decimal(15,4) not null default 0,
-  billed_quantity decimal(15,4) not null default 0,
-  unit nvarchar(32) not null default '',
-  rate decimal(15,4) not null default 0,
-  gross_rate decimal(15,4) not null default 0,
-  amount decimal(17,2) not null default 0,
-  additional_amount decimal(17,2) not null default 0,
-  discount_amount decimal(17,2) not null default 0,
-  discount_percent decimal(15,4) not null default 0,
-  godown nvarchar(1024),
-  godown_guid varchar(64) not null default '',
-  tracking_number nvarchar(256),
-  order_number nvarchar(256),
-  order_duedate date
+ guid varchar(64),
+ item nvarchar(1024),
+ _item varchar(64),
+ quantity decimal(15,4),
+ rate decimal(15,4),
+ amount decimal(17,2),
+ additional_amount decimal(17,2),
+ discount_amount decimal(17,2),
+ godown nvarchar(1024),
+ _godown varchar(64),
+ tracking_number nvarchar(256),
+ order_number nvarchar(256),
+ order_duedate date
 );
 
 create table trn_cost_centre
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  costcentre nvarchar(1024) not null default '',
-  costcentre_guid varchar(64) not null default '',
-  amount decimal(17,2) not null default 0
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ costcentre nvarchar(1024),
+ _costcentre varchar(64),
+ amount decimal(17,2)
 );
 
 create table trn_cost_category_centre
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  costcategory nvarchar(1024) not null default '',
-  costcategory_guid varchar(64) not null default '',
-  costcentre nvarchar(1024) not null default '',
-  costcentre_guid varchar(64) not null default '',
-  amount decimal(17,2) not null default 0
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ costcategory nvarchar(1024),
+ _costcategory varchar(64),
+ costcentre nvarchar(1024),
+ _costcentre varchar(64),
+ amount decimal(17,2)
 );
 
 create table trn_cost_inventory_category_centre
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  costcategory nvarchar(1024) not null default '',
-  costcategory_guid varchar(64) not null default '',
-  costcentre nvarchar(1024) not null default '',
-  costcentre_guid varchar(64) not null default '',
-  amount decimal(17,2) not null default 0
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ item nvarchar(1024),
+ _item varchar(64),
+ costcategory nvarchar(1024),
+ _costcategory varchar(64),
+ costcentre nvarchar(1024),
+ _costcentre varchar(64),
+ amount decimal(17,2)
 );
 
 create table trn_bill
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  name nvarchar(1024) not null default '',
-  amount decimal(17,2) not null default 0,
-  billtype nvarchar(256) not null default '',
-  bill_credit_period int not null default 0,
-  due_date date,
-  is_advance tinyint
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ name nvarchar(1024),
+ amount decimal(17,2),
+ billtype nvarchar(256),
+ bill_credit_period int
 );
 
 create table trn_bank
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  transaction_type nvarchar(32) not null default '',
-  instrument_date date,
-  instrument_number nvarchar(1024) not null default '',
-  bank_name nvarchar(64) not null default '',
-  amount decimal(17,2) not null default 0,
-  bankers_date date
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ transaction_type nvarchar(32),
+ instrument_date date,
+ instrument_number nvarchar(1024),
+ bank_name nvarchar(64),
+ amount decimal(17,2),
+ bankers_date date
 );
 
 create table trn_batch
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  item nvarchar(1024) not null default '',
-  item_guid varchar(64) not null default '',
-  name nvarchar(1024) not null default '',
-  quantity decimal(15,4) not null default 0,
-  amount decimal(17,2) not null default 0,
-  godown nvarchar(1024),
-  godown_guid varchar(64) not null default '',
-  destination_godown nvarchar(1024),
-  destination_godown_guid varchar(64) not null default '',
-  tracking_number nvarchar(1024)
+ guid varchar(64),
+ item nvarchar(1024),
+ _item varchar(64),
+ name nvarchar(1024),
+ quantity decimal(15,4),
+ amount decimal(17,2),
+ godown nvarchar(1024),
+ _godown varchar(64),
+ destination_godown nvarchar(1024),
+ _destination_godown varchar(64),
+ tracking_number nvarchar(1024)
 );
 
-create table trn_inventory_accounting
+create table trn_inventory_additional_cost
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  ledger nvarchar(1024) not null default '',
-  ledger_guid varchar(64) not null default '',
-  amount decimal(17,2) not null default 0,
-  additional_allocation_type nvarchar(32) not null default ''
+ guid varchar(64),
+ ledger nvarchar(1024),
+ _ledger varchar(64),
+ amount decimal(17,2),
+ additional_allocation_type nvarchar(32),
+ rate_of_invoice_tax decimal(9,4)
 );
 
 create table trn_employee
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  category nvarchar(1024) not null default '',
-  employee_name nvarchar(1024) not null default '',
-  amount decimal(17,2) not null default 0,
-  employee_sort_order int not null default 0
+ guid varchar(64),
+ category nvarchar(1024),
+ _category varchar(64),
+ employee_name nvarchar(1024),
+ _employee_name varchar(64),
+ amount decimal(17,2),
+ employee_sort_order int
 );
 
 create table trn_payhead
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  category nvarchar(1024) not null default '',
-  employee_name nvarchar(1024) not null default '',
-  employee_sort_order int not null default 0,
-  payhead_name nvarchar(1024) not null default '',
-  payhead_sort_order int not null default 0,
-  amount decimal(17,2) not null default 0
+ guid varchar(64),
+ category nvarchar(1024),
+ _category varchar(64),
+ employee_name nvarchar(1024),
+ _employee_name varchar(64),
+ employee_sort_order int,
+ payhead_name nvarchar(1024),
+ _payhead_name varchar(64),
+ payhead_sort_order int,
+ amount decimal(17,2)
 );
 
 create table trn_attendance
 (
-  guid varchar(64) not null default '',
-  voucher_key int not null default 0,
-  voucher_guid varchar(64) not null default '',
-  voucher_alter_id int not null default 0,
-  voucher_type nvarchar(1024) not null default '',
-  voucher_date date,
-  employee_name nvarchar(1024) not null default '',
-  attendancetype_name nvarchar(1024) not null default '',
-  time_value decimal(17,2) not null default 0,
-  type_value decimal(17,2) not null default 0
+ guid varchar(64),
+ employee_name nvarchar(1024),
+ _employee_name varchar(64),
+ attendancetype_name nvarchar(1024),
+ _attendancetype_name varchar(64),
+ time_value decimal(17,2),
+ type_value decimal(17,2)
 );
