@@ -80,13 +80,15 @@ async function checkStaleData(): Promise<void> {
     }
 }
 
-function invokeImport(): Promise<void> {
-    return new Promise<void>(async (resolve) => {
+function invokeImport(): Promise<boolean> {
+    return new Promise<boolean>(async (resolve) => {
+        let succeeded = false;
         try {
             isSyncRunning = true;
             await tally.importData();
             logger.logMessage('Import completed successfully [%s]', new Date().toLocaleString());
             consecutiveFailures = 0;
+            succeeded = true;
         }
         catch (err) {
             logger.logMessage('Error in importing data\r\nPlease check error-log.txt file for detailed errors [%s]', new Date().toLocaleString());
@@ -98,7 +100,7 @@ function invokeImport(): Promise<void> {
         }
         finally {
             isSyncRunning = false;
-            resolve();
+            resolve(succeeded);
         }
     });
 }
@@ -127,14 +129,16 @@ else { // continuous sync
                 //update local variable copy of last alter ID
                 lastMasterAlterId = tally.lastAlterIdMaster;
                 lastTransactionAlterId = tally.lastAlterIdTransaction;
-                await invokeImport();
+                // Capture pre-sync alter_id before importData() overwrites it
+                const preSyncAlterIdStored = await database.executeScalar<number>(
+                    `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
+                ) ?? 0;
 
-                // After incremental: check for Tally restart and stale data
-                if (tally.config.sync === 'incremental') {
-                    const lastStored = await database.executeScalar<number>(
-                        `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
-                    ) ?? 0;
-                    await checkAlterIdReset(lastStored);
+                const syncSucceeded = await invokeImport();
+
+                // After incremental: check for Tally restart and stale data (only on success)
+                if (syncSucceeded && tally.config.sync === 'incremental') {
+                    await checkAlterIdReset(preSyncAlterIdStored);
                     await checkStaleData();
                 }
             }
