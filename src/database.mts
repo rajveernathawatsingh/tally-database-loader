@@ -16,6 +16,8 @@ class _database {
     maxQuerySize = 65535; //maximum size of SQL query to be executed
     bigquery: BigQuery = new BigQuery();
     connectionPoolPostgres: postgres.Pool = new postgres.Pool({});
+    private pgTransactionClient: import('pg').PoolClient | null = null;
+    private pgTransactionRowCounts: Record<string, number> = {};
 
     constructor() {
         try {
@@ -392,6 +394,38 @@ class _database {
         });
     }
 
+    async beginTransaction(): Promise<void> {
+        if (this.pgTransactionClient) {
+            throw new Error('Transaction already in progress');
+        }
+        this.pgTransactionClient = await this.connectionPoolPostgres.connect();
+        this.pgTransactionRowCounts = {};
+        await this.pgTransactionClient.query('BEGIN');
+    }
+
+    async commitTransaction(): Promise<Record<string, number>> {
+        if (!this.pgTransactionClient) {
+            throw new Error('No transaction in progress');
+        }
+        await this.pgTransactionClient.query('COMMIT');
+        this.pgTransactionClient.release();
+        this.pgTransactionClient = null;
+        const counts = { ...this.pgTransactionRowCounts };
+        this.pgTransactionRowCounts = {};
+        return counts;
+    }
+
+    async rollbackTransaction(): Promise<void> {
+        if (!this.pgTransactionClient) return;
+        try {
+            await this.pgTransactionClient.query('ROLLBACK');
+        } finally {
+            this.pgTransactionClient.release();
+            this.pgTransactionClient = null;
+            this.pgTransactionRowCounts = {};
+        }
+    }
+
     executeNonQuery(sqlQuery: string | string[], values?: Map<string, any>): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
             try {
@@ -725,18 +759,25 @@ class _database {
 
     private dumpDataPostges(targetTable: string): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
-            let connection = await this.connectionPoolPostgres.connect();
+            const connection = this.pgTransactionClient ?? await this.connectionPoolPostgres.connect();
+            const releaseAfter = !this.pgTransactionClient;
             try {
                 const sourceStream = fs.createReadStream(`./csv/${targetTable}.data`, 'utf-8');
                 let ptrCopyQueryStream = pgLoadInto(`copy ${targetTable} from stdin csv header;`);
                 const targetStream = connection.query(ptrCopyQueryStream);
                 await pipeline(sourceStream, targetStream);
+                if (this.pgTransactionClient) {
+                    const countResult = await connection.query<{ count: string }>(
+                        `SELECT COUNT(*) as count FROM ${targetTable}`
+                    );
+                    this.pgTransactionRowCounts[targetTable] = parseInt(countResult.rows[0].count, 10);
+                }
                 resolve(ptrCopyQueryStream.rowCount || 0);
             } catch (err) {
                 reject(err);
                 logger.logError(`database.dumpDataPostges(${targetTable})`, err);
             } finally {
-                connection.release();
+                if (releaseAfter) connection.release();
             }
         });
     }
