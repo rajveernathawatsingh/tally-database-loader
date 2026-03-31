@@ -466,3 +466,64 @@ create table trn_attendance
  time_value decimal(17,2),
  type_value decimal(17,2)
 );
+
+-- Sync audit log — tracks every sync run, alter_id cursor, and row counts
+CREATE TABLE IF NOT EXISTS sync_log (
+    id            SERIAL PRIMARY KEY,
+    sync_type     TEXT NOT NULL,
+    started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at  TIMESTAMPTZ,
+    status        TEXT NOT NULL DEFAULT 'running',
+    alter_id_from BIGINT,
+    alter_id_to   BIGINT,
+    rows_upserted JSONB,
+    error_message TEXT
+);
+
+-- Purchase order line items (order vouchers with VoucherTypeName = "Purchase Order")
+CREATE TABLE IF NOT EXISTS trn_purchase_order (
+    guid             varchar(64)    NOT NULL,
+    voucher_key      bigint,
+    voucher_guid     varchar(64),
+    voucher_alter_id int,
+    voucher_date     date,
+    voucher_number   varchar(64),
+    party_name       varchar(256),
+    party_guid       varchar(64),
+    narration        text,
+    line_no          int,
+    item             varchar(256),
+    item_guid        varchar(64),
+    quantity         numeric(15,4),
+    unit             varchar(32),
+    rate             numeric(15,4),
+    amount           numeric(15,4),
+    order_duedate    date,
+    godown           varchar(256),
+    godown_guid      varchar(64),
+    tracking_number  varchar(256)
+);
+
+-- Sales order line items (order vouchers with VoucherTypeName = "Sales Order")
+CREATE TABLE IF NOT EXISTS trn_sales_order (
+    guid             varchar(64)    NOT NULL,
+    voucher_key      bigint,
+    voucher_guid     varchar(64),
+    voucher_alter_id int,
+    voucher_date     date,
+    voucher_number   varchar(64),
+    party_name       varchar(256),
+    party_guid       varchar(64),
+    narration        text,
+    line_no          int,
+    item             varchar(256),
+    item_guid        varchar(64),
+    quantity         numeric(15,4),
+    unit             varchar(32),
+    rate             numeric(15,4),
+    amount           numeric(15,4),
+    order_duedate    date,
+    godown           varchar(256),
+    godown_guid      varchar(64),
+    tracking_number  varchar(256)
+);
