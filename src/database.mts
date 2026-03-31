@@ -15,7 +15,7 @@ class _database {
     config: connectionConfig;
     maxQuerySize = 65535; //maximum size of SQL query to be executed
     bigquery: BigQuery = new BigQuery();
-    connectionPoolPostgres: postgres.Pool = new postgres.Pool({});
+    connectionPoolPostgres: postgres.Pool = null!; // initialized lazily in openConnectionPool()
     private pgTransactionClient: import('pg').PoolClient | null = null;
     private pgTransactionRowCounts: Record<string, number> = {};
 
@@ -72,6 +72,7 @@ class _database {
         return new Promise<void>(async (resolve, reject) => {
             try {
                 if (this.config.technology == 'postgres') {
+                    if (this.connectionPoolPostgres) { resolve(); return; } // already initialized
                     this.connectionPoolPostgres = new postgres.Pool({
                         host: this.config.server,
                         port: this.config.port,
