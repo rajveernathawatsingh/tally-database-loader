@@ -27,9 +27,16 @@ function parseCommandlineOptions() {
 }
 async function checkStaleSyncEntries() {
     // Find any sync_log entries stuck in 'running' for > 30 minutes
-    const stuckCount = await database.executeScalar(`SELECT COUNT(*) FROM sync_log
-         WHERE status = 'running'
-         AND started_at < now() - INTERVAL '30 minutes'`) ?? 0;
+    // Skip gracefully on first run before sync_log table exists
+    let stuckCount;
+    try {
+        stuckCount = await database.executeScalar(`SELECT COUNT(*) FROM sync_log
+             WHERE status = 'running'
+             AND started_at < now() - INTERVAL '30 minutes'`) ?? 0;
+    }
+    catch {
+        return; // sync_log table doesn't exist yet (fresh install) — nothing to check
+    }
     if (stuckCount > 0) {
         console.log(`[startup] Found ${stuckCount} stuck sync_log entries — marking failed and forcing full sync`);
         await database.executeNonQuery(`UPDATE sync_log
@@ -93,6 +100,7 @@ database.updateCommandlineConfig(cmdConfig);
 tally.updateCommandlineConfig(cmdConfig);
 if (tally.config.frequency <= 0) { // on-demand sync
     // On startup: fix any crashed sync_log entries from previous run
+    await database.openConnectionPool();
     await checkStaleSyncEntries();
     await invokeImport();
     logger.closeStreams();
@@ -136,6 +144,7 @@ else { // continuous sync
     }
     else { // go ahead with continuous sync
         // On startup: fix any crashed sync_log entries from previous run
+        await database.openConnectionPool();
         await checkStaleSyncEntries();
         setInterval(async () => await triggerImport(), tally.config.frequency * 60000);
         await triggerImport();

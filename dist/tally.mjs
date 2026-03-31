@@ -590,8 +590,8 @@ class _tally {
                         else
                             ;
                     }
-                    // After all tables complete, get max alter_id from trn_voucher
-                    const alterIdTo = await database.executeScalar(`SELECT coalesce(max(alter_id), 0) FROM trn_voucher`) ?? 0;
+                    // After all tables complete, get current alter_id from Tally
+                    const alterIdTo = await this.getCurrentTransactionAlterId();
                     const rowCounts = await database.commitTransaction();
                     if (this.currentSyncLogId) {
                         await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdTo, rowCounts);
@@ -617,10 +617,16 @@ class _tally {
         });
     }
     async writeSyncLogStart(syncType, alterIdFrom) {
-        const result = await database.executeScalar(`INSERT INTO sync_log (sync_type, alter_id_from, status)
-             VALUES ('${syncType}', ${alterIdFrom}, 'running')
-             RETURNING id`);
-        return result ?? 0;
+        // Returns 0 on fresh install before sync_log table exists — sync_log writes are skipped via null-guard
+        try {
+            const result = await database.executeScalar(`INSERT INTO sync_log (sync_type, alter_id_from, status)
+                 VALUES ('${syncType}', ${alterIdFrom}, 'running')
+                 RETURNING id`);
+            return result ?? 0;
+        }
+        catch {
+            return 0;
+        }
     }
     async writeSyncLogEnd(id, status, alterIdTo, rowCounts, errorMessage) {
         const rowCountsJson = JSON.stringify(rowCounts).replace(/'/g, "''");
