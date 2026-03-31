@@ -1,0 +1,23 @@
+{
+    "database": {
+        "technology": "postgres",
+        "server": "localhost",
+        "port": 5432,
+        "ssl": false,
+        "schema": "tally_mirror",
+        "username": "tally_user",
+        "password": "CHANGE_ME",
+        "loadmethod": "file"
+    },
+    "tally": {
+        "definition": "tally-export-config.yaml",
+        "server": "TALLY_SERVER_IP",
+        "port": 9000,
+        "fromdate": "auto",
+        "todate": "auto",
+        "sync": "full",
+        "frequency": 0,
+        "batchsize": 5000,
+        "company": "EXACT_TALLY_COMPANY_NAME"
+    }
+}
