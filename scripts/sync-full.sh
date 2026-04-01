@@ -13,7 +13,7 @@ echo "[$TIMESTAMP] Starting full sync" >> "$LOG_FILE"
 
 cd "$TALLY_SYNC_DIR"
 
-if node ./dist/index.mjs --tally-sync full --tally-definition tally-export-config.yaml >> "$LOG_FILE" 2>> "$ERROR_FILE"; then
+if node ./dist/index.mjs --tally-sync full --tally-definition tally-export-config-incremental.yaml >> "$LOG_FILE" 2>> "$ERROR_FILE"; then
     EXIT_CODE=0
     echo "[$TIMESTAMP] Full sync completed successfully" >> "$LOG_FILE"
 else

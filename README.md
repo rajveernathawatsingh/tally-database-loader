@@ -2,7 +2,9 @@
 ![logo](https://excelkida.com/image/github/tally-database-loader.png)
 
 ##Installation
-* After cloning the repository run "npx tsc -p ./src/tsconfig.json" for the updates.
+* After cloning the repository, copy `config.example.json` to `config.json` and fill in the local credentials.
+* Run `npm run build` after source updates.
+* Run `npm test` to execute the reliability helper tests against the built output.
 
 
 Commandline utility to load data into Database Server from Tally software, intended for further use by

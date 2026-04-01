@@ -138,10 +138,15 @@ class _database {
         return new Promise<void>(async (resolve, reject) => {
             try {
                 if (this.config.technology == 'postgres') {
-                    await this.connectionPoolPostgres.end();
+                    if (this.connectionPoolPostgres) {
+                        await this.connectionPoolPostgres.end();
+                        this.connectionPoolPostgres = null!;
+                    }
                 }
                 else if (this.config.technology == 'mysql') {
-                    await connectionPoolMysql.end();
+                    if (connectionPoolMysql) {
+                        await connectionPoolMysql.end();
+                    }
                 }
                 else;
                 resolve();
@@ -150,6 +155,491 @@ class _database {
                 logger.logError('database.closeConnectionPool()', err);
             }
         });
+    }
+
+    supportsTransactionalSync(): boolean {
+        return this.config.technology == 'postgres';
+    }
+
+    supportsSyncLog(): boolean {
+        return this.config.technology == 'postgres';
+    }
+
+    supportsMirrorAuditTables(): boolean {
+        return this.config.technology == 'postgres';
+    }
+
+    async ensureSyncLogTable(): Promise<void> {
+        if (!this.supportsSyncLog()) {
+            return;
+        }
+        await this.executeNonQuery(
+            `CREATE TABLE IF NOT EXISTS sync_log (
+                id            SERIAL PRIMARY KEY,
+                sync_type     TEXT NOT NULL,
+                started_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+                completed_at  TIMESTAMPTZ,
+                status        TEXT NOT NULL DEFAULT 'running',
+                alter_id_from BIGINT,
+                alter_id_to   BIGINT,
+                rows_upserted JSONB,
+                error_message TEXT
+            )`
+        );
+    }
+
+    async ensureMirrorOrderTables(): Promise<void> {
+        if (!/^(mssql|mysql|postgres)$/g.test(this.config.technology)) {
+            return;
+        }
+
+        const postgresQueries = [
+            `CREATE TABLE IF NOT EXISTS trn_purchase_order (
+                guid            varchar(64) NOT NULL,
+                voucher_key     bigint,
+                voucher_guid    varchar(64),
+                voucher_alter_id bigint,
+                voucher_date    date,
+                voucher_number  varchar(64),
+                party_name      varchar(256),
+                party_guid      varchar(64),
+                narration       text,
+                line_no         int,
+                item            varchar(256),
+                item_guid       varchar(64),
+                quantity        numeric(15,4),
+                unit            varchar(32),
+                rate            numeric(15,4),
+                amount          numeric(17,2),
+                order_duedate   date,
+                godown          varchar(256),
+                godown_guid     varchar(64),
+                tracking_number varchar(256)
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_sales_order (
+                guid            varchar(64) NOT NULL,
+                voucher_key     bigint,
+                voucher_guid    varchar(64),
+                voucher_alter_id bigint,
+                voucher_date    date,
+                voucher_number  varchar(64),
+                party_name      varchar(256),
+                party_guid      varchar(64),
+                narration       text,
+                line_no         int,
+                item            varchar(256),
+                item_guid       varchar(64),
+                quantity        numeric(15,4),
+                unit            varchar(32),
+                rate            numeric(15,4),
+                amount          numeric(17,2),
+                order_duedate   date,
+                godown          varchar(256),
+                godown_guid     varchar(64),
+                tracking_number varchar(256)
+            )`
+        ];
+
+        const mysqlQueries = [
+            `CREATE TABLE IF NOT EXISTS trn_purchase_order (
+                guid             varchar(64) NOT NULL,
+                voucher_key      bigint,
+                voucher_guid     varchar(64),
+                voucher_alter_id bigint,
+                voucher_date     date,
+                voucher_number   varchar(64),
+                party_name       varchar(256),
+                party_guid       varchar(64),
+                narration        text,
+                line_no          int,
+                item             varchar(256),
+                item_guid        varchar(64),
+                quantity         decimal(15,4),
+                unit             varchar(32),
+                rate             decimal(15,4),
+                amount           decimal(17,2),
+                order_duedate    date,
+                godown           varchar(256),
+                godown_guid      varchar(64),
+                tracking_number  varchar(256)
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_sales_order (
+                guid             varchar(64) NOT NULL,
+                voucher_key      bigint,
+                voucher_guid     varchar(64),
+                voucher_alter_id bigint,
+                voucher_date     date,
+                voucher_number   varchar(64),
+                party_name       varchar(256),
+                party_guid       varchar(64),
+                narration        text,
+                line_no          int,
+                item             varchar(256),
+                item_guid        varchar(64),
+                quantity         decimal(15,4),
+                unit             varchar(32),
+                rate             decimal(15,4),
+                amount           decimal(17,2),
+                order_duedate    date,
+                godown           varchar(256),
+                godown_guid      varchar(64),
+                tracking_number  varchar(256)
+            )`
+        ];
+
+        const mssqlQueries = [
+            `IF OBJECT_ID('trn_purchase_order', 'U') IS NULL
+             BEGIN
+                CREATE TABLE trn_purchase_order (
+                    guid             varchar(64) NOT NULL,
+                    voucher_key      bigint,
+                    voucher_guid     varchar(64),
+                    voucher_alter_id bigint,
+                    voucher_date     date,
+                    voucher_number   varchar(64),
+                    party_name       varchar(256),
+                    party_guid       varchar(64),
+                    narration        varchar(4000),
+                    line_no          int,
+                    item             varchar(256),
+                    item_guid        varchar(64),
+                    quantity         decimal(15,4),
+                    unit             varchar(32),
+                    rate             decimal(15,4),
+                    amount           decimal(17,2),
+                    order_duedate    date,
+                    godown           varchar(256),
+                    godown_guid      varchar(64),
+                    tracking_number  varchar(256)
+                )
+             END`,
+            `IF OBJECT_ID('trn_sales_order', 'U') IS NULL
+             BEGIN
+                CREATE TABLE trn_sales_order (
+                    guid             varchar(64) NOT NULL,
+                    voucher_key      bigint,
+                    voucher_guid     varchar(64),
+                    voucher_alter_id bigint,
+                    voucher_date     date,
+                    voucher_number   varchar(64),
+                    party_name       varchar(256),
+                    party_guid       varchar(64),
+                    narration        varchar(4000),
+                    line_no          int,
+                    item             varchar(256),
+                    item_guid        varchar(64),
+                    quantity         decimal(15,4),
+                    unit             varchar(32),
+                    rate             decimal(15,4),
+                    amount           decimal(17,2),
+                    order_duedate    date,
+                    godown           varchar(256),
+                    godown_guid      varchar(64),
+                    tracking_number  varchar(256)
+                )
+             END`
+        ];
+
+        if (this.config.technology == 'postgres') {
+            await this.executeNonQuery(postgresQueries);
+        } else if (this.config.technology == 'mysql') {
+            await this.executeNonQuery(mysqlQueries);
+        } else if (this.config.technology == 'mssql') {
+            await this.executeNonQuery(mssqlQueries);
+        }
+    }
+
+    async ensureMirrorAuditTables(): Promise<void> {
+        if (!this.supportsMirrorAuditTables()) {
+            return;
+        }
+
+        const queries = [
+            `CREATE TABLE IF NOT EXISTS _diff (
+                guid varchar(64) NOT NULL,
+                alterid int
+            )`,
+            `CREATE TABLE IF NOT EXISTS _delete (
+                guid varchar(64) NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS _vchnumber (
+                guid varchar(64) NOT NULL,
+                voucher_number varchar(256)
+            )`,
+            `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_ledger ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_ledger ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_vouchertype ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_vouchertype ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_uom ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_godown ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_godown ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_stock_category ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_stock_category ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_stock_group ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_stock_group ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_stock_item ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_stock_item ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_stock_item ADD COLUMN IF NOT EXISTS _category varchar(64)`,
+            `ALTER TABLE mst_stock_item ADD COLUMN IF NOT EXISTS _uom varchar(64)`,
+            `ALTER TABLE mst_stock_item ADD COLUMN IF NOT EXISTS _alternate_uom varchar(64)`,
+            `ALTER TABLE mst_cost_category ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_cost_centre ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_cost_centre ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_attendance_type ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_attendance_type ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_attendance_type ADD COLUMN IF NOT EXISTS _uom varchar(64)`,
+            `ALTER TABLE mst_employee ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_employee ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_payhead ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE mst_payhead ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
+            `ALTER TABLE mst_gst_effective_rate ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE mst_opening_batch_allocation ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE mst_opening_batch_allocation ADD COLUMN IF NOT EXISTS _godown varchar(64)`,
+            `ALTER TABLE mst_opening_bill_allocation ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_closingstock_ledger ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE mst_stockitem_standard_cost ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE mst_stockitem_standard_price ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE trn_voucher ADD COLUMN IF NOT EXISTS alterid int`,
+            `ALTER TABLE trn_voucher ADD COLUMN IF NOT EXISTS _voucher_type varchar(64)`,
+            `ALTER TABLE trn_voucher ADD COLUMN IF NOT EXISTS _party_name varchar(64)`,
+            `ALTER TABLE trn_accounting ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_inventory ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE trn_inventory ADD COLUMN IF NOT EXISTS _godown varchar(64)`,
+            `ALTER TABLE trn_cost_centre ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_cost_centre ADD COLUMN IF NOT EXISTS _costcentre varchar(64)`,
+            `ALTER TABLE trn_cost_category_centre ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_cost_category_centre ADD COLUMN IF NOT EXISTS _costcategory varchar(64)`,
+            `ALTER TABLE trn_cost_category_centre ADD COLUMN IF NOT EXISTS _costcentre varchar(64)`,
+            `ALTER TABLE trn_cost_inventory_category_centre ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_cost_inventory_category_centre ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE trn_cost_inventory_category_centre ADD COLUMN IF NOT EXISTS _costcategory varchar(64)`,
+            `ALTER TABLE trn_cost_inventory_category_centre ADD COLUMN IF NOT EXISTS _costcentre varchar(64)`,
+            `ALTER TABLE trn_bill ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_bank ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_batch ADD COLUMN IF NOT EXISTS _item varchar(64)`,
+            `ALTER TABLE trn_batch ADD COLUMN IF NOT EXISTS _godown varchar(64)`,
+            `ALTER TABLE trn_batch ADD COLUMN IF NOT EXISTS _destination_godown varchar(64)`,
+            `ALTER TABLE trn_inventory_additional_cost ADD COLUMN IF NOT EXISTS _ledger varchar(64)`,
+            `ALTER TABLE trn_employee ADD COLUMN IF NOT EXISTS _category varchar(64)`,
+            `ALTER TABLE trn_employee ADD COLUMN IF NOT EXISTS _employee_name varchar(64)`,
+            `ALTER TABLE trn_payhead ADD COLUMN IF NOT EXISTS _category varchar(64)`,
+            `ALTER TABLE trn_payhead ADD COLUMN IF NOT EXISTS _employee_name varchar(64)`,
+            `ALTER TABLE trn_payhead ADD COLUMN IF NOT EXISTS _payhead_name varchar(64)`,
+            `ALTER TABLE trn_attendance ADD COLUMN IF NOT EXISTS _employee_name varchar(64)`,
+            `ALTER TABLE trn_attendance ADD COLUMN IF NOT EXISTS _attendancetype_name varchar(64)`,
+            `CREATE TABLE IF NOT EXISTS mst_company (
+                company_guid varchar(64) PRIMARY KEY,
+                company_name varchar(1024) NOT NULL,
+                books_from date,
+                period_from date,
+                period_to date,
+                last_voucher_date date,
+                mailing_address text,
+                state_name varchar(256),
+                country_name varchar(256),
+                pincode varchar(32),
+                email varchar(256),
+                vat_tin varchar(64),
+                last_alter_id_master bigint,
+                last_alter_id_transaction bigint,
+                synced_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS mailing_address text`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS state_name varchar(256)`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS country_name varchar(256)`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS pincode varchar(32)`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS email varchar(256)`,
+            `ALTER TABLE mst_company ADD COLUMN IF NOT EXISTS vat_tin varchar(64)`,
+            `CREATE TABLE IF NOT EXISTS trn_voucher_state (
+                guid varchar(64) PRIMARY KEY,
+                voucher_key varchar(64),
+                alterid bigint,
+                date date,
+                voucher_type varchar(1024),
+                _voucher_type varchar(64),
+                voucher_number varchar(64),
+                reference_number varchar(64),
+                reference_date date,
+                narration text,
+                party_name varchar(256),
+                _party_name varchar(64),
+                place_of_supply varchar(256),
+                is_invoice smallint,
+                is_accounting_voucher smallint,
+                is_inventory_voucher smallint,
+                is_order_voucher smallint,
+                is_optional smallint,
+                is_cancelled smallint,
+                source_sync_log_id bigint,
+                last_synced_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_voucher_history (
+                id bigserial PRIMARY KEY,
+                guid varchar(64) NOT NULL,
+                alterid bigint,
+                voucher_date date,
+                voucher_number varchar(64),
+                action_type text NOT NULL,
+                sync_type text NOT NULL,
+                sync_log_id bigint,
+                recorded_at timestamptz NOT NULL DEFAULT now(),
+                row_hash varchar(32) NOT NULL,
+                row_json jsonb NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS mst_ledger_history (
+                id bigserial PRIMARY KEY,
+                guid varchar(64) NOT NULL,
+                name varchar(1024),
+                alterid bigint,
+                action_type text NOT NULL,
+                sync_type text NOT NULL,
+                sync_log_id bigint,
+                recorded_at timestamptz NOT NULL DEFAULT now(),
+                row_hash varchar(32) NOT NULL,
+                row_json jsonb NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS mst_stock_item_history (
+                id bigserial PRIMARY KEY,
+                guid varchar(64) NOT NULL,
+                name varchar(1024),
+                alterid bigint,
+                action_type text NOT NULL,
+                sync_type text NOT NULL,
+                sync_log_id bigint,
+                recorded_at timestamptz NOT NULL DEFAULT now(),
+                row_hash varchar(32) NOT NULL,
+                row_json jsonb NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_voucher_deleted (
+                id bigserial PRIMARY KEY,
+                guid varchar(64) NOT NULL,
+                alterid bigint,
+                voucher_date date,
+                voucher_number varchar(64),
+                sync_type text NOT NULL,
+                sync_log_id bigint,
+                deleted_at timestamptz NOT NULL DEFAULT now(),
+                row_json jsonb NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS mst_deleted (
+                id bigserial PRIMARY KEY,
+                source_table text NOT NULL,
+                guid varchar(64) NOT NULL,
+                name varchar(1024),
+                alterid bigint,
+                sync_type text NOT NULL,
+                sync_log_id bigint,
+                deleted_at timestamptz NOT NULL DEFAULT now(),
+                row_json jsonb NOT NULL
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_bill_status_snapshot (
+                id bigserial PRIMARY KEY,
+                bill_name varchar(1024),
+                ledger varchar(1024),
+                origin_guid varchar(64),
+                origin_voucher_type varchar(1024),
+                origin_voucher_number varchar(64),
+                bill_date date,
+                party_name varchar(256),
+                bill_type varchar(256),
+                bill_amount decimal(17,2),
+                adjusted_amount decimal(17,2),
+                pending_amount decimal(17,2),
+                source_sync_log_id bigint,
+                snapshot_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_workflow_link (
+                id bigserial PRIMARY KEY,
+                link_type text NOT NULL,
+                source_voucher_guid varchar(64) NOT NULL,
+                target_voucher_guid varchar(64) NOT NULL,
+                source_voucher_type varchar(1024),
+                target_voucher_type varchar(1024),
+                source_date date,
+                target_date date,
+                party_name varchar(256),
+                item varchar(1024),
+                tracking_number varchar(256),
+                order_number varchar(256),
+                source_sync_log_id bigint,
+                snapshot_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS trn_gst_component (
+                id bigserial PRIMARY KEY,
+                guid varchar(64) NOT NULL,
+                voucher_date date,
+                voucher_type varchar(1024),
+                voucher_number varchar(64),
+                party_name varchar(256),
+                ledger varchar(1024),
+                duty_head varchar(64),
+                component_type varchar(64),
+                amount decimal(17,2),
+                source_sync_log_id bigint,
+                snapshot_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS mst_currency (
+                currency_code varchar(16) PRIMARY KEY,
+                first_voucher_date date,
+                last_voucher_date date,
+                transaction_count bigint NOT NULL DEFAULT 0,
+                forex_row_count bigint NOT NULL DEFAULT 0,
+                last_synced_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS fx_rate_snapshot (
+                id bigserial PRIMARY KEY,
+                currency_code varchar(16) NOT NULL,
+                voucher_date date NOT NULL,
+                sample_count bigint NOT NULL DEFAULT 0,
+                avg_rate numeric(18,8),
+                min_rate numeric(18,8),
+                max_rate numeric(18,8),
+                rate_source text NOT NULL DEFAULT 'IMPLIED_FROM_VOUCHER',
+                source_sync_log_id bigint,
+                snapshot_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE TABLE IF NOT EXISTS sync_table_coverage (
+                id bigserial PRIMARY KEY,
+                sync_log_id bigint,
+                sync_type text NOT NULL,
+                table_name varchar(128) NOT NULL,
+                collection_name varchar(256),
+                table_nature varchar(32),
+                is_master smallint NOT NULL DEFAULT 0,
+                rows_loaded bigint NOT NULL DEFAULT 0,
+                row_count_after bigint NOT NULL DEFAULT 0,
+                definition_path text,
+                definition_hash varchar(32),
+                field_list text,
+                fetch_list text,
+                filter_text text,
+                captures_cancelled smallint NOT NULL DEFAULT 0,
+                captures_optional smallint NOT NULL DEFAULT 0,
+                recorded_at timestamptz NOT NULL DEFAULT now()
+            )`,
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_mst_company_name ON mst_company(company_name)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_voucher_state_flags ON trn_voucher_state(is_cancelled, is_optional, date)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_voucher_state_party ON trn_voucher_state(_party_name, date)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_voucher_history_guid ON trn_voucher_history(guid, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_voucher_history_sync ON trn_voucher_history(sync_log_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_mst_ledger_history_guid ON mst_ledger_history(guid, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_mst_stock_item_history_guid ON mst_stock_item_history(guid, id DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_voucher_deleted_guid ON trn_voucher_deleted(guid, deleted_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_mst_deleted_lookup ON mst_deleted(source_table, guid, deleted_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_bill_status_snapshot_bill ON trn_bill_status_snapshot(ledger, bill_name)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_workflow_link_lookup ON trn_workflow_link(link_type, source_voucher_guid, target_voucher_guid)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_workflow_link_tracking ON trn_workflow_link(tracking_number)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_workflow_link_order_no ON trn_workflow_link(order_number)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_gst_component_guid ON trn_gst_component(guid)`,
+            `CREATE INDEX IF NOT EXISTS idx_trn_gst_component_type ON trn_gst_component(component_type, voucher_date)`,
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_fx_rate_snapshot_unique ON fx_rate_snapshot(currency_code, voucher_date, rate_source)`,
+            `CREATE INDEX IF NOT EXISTS idx_sync_table_coverage_run ON sync_table_coverage(sync_log_id, table_name)`,
+            `CREATE INDEX IF NOT EXISTS idx_sync_table_coverage_table ON sync_table_coverage(table_name, recorded_at DESC)`
+        ];
+
+        await this.executeNonQuery(queries);
     }
 
     convertCSV(content: string, lstFieldType: string[], doubleQuote: boolean = false): string {
@@ -270,7 +760,7 @@ class _database {
         });
     }
 
-    bulkLoad(csvFile: string, targetTable: string, lstFieldType: string[]): Promise<number> {
+    bulkLoad(csvFile: string, targetTable: string, lstFieldType: string[], fieldNames?: string[]): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
             let sqlQuery = '';
             try {
@@ -350,9 +840,12 @@ class _database {
                         rowCount = await this.dumpDataMssql(targetTable, lstFieldType);
                     }
                     else if (this.config.technology == 'postgres') {
-                        rowCount = await this.dumpDataPostges(targetTable);
+                        rowCount = await this.dumpDataPostges(targetTable, fieldNames);
                     }
                     else;
+                }
+                if (this.pgTransactionClient && this.config.technology == 'postgres' && !targetTable.startsWith('_')) {
+                    this.pgTransactionRowCounts[targetTable] = rowCount;
                 }
                 resolve(rowCount);
             } catch (err: any) {
@@ -379,11 +872,14 @@ class _database {
                     retval = await this.dumpDataMssqlJson(targetTable, lstTableData);
                 } else if (this.config.technology == 'postgres') {
                     await this.jsonToCsv(`./csv/${targetTable.name}.data`, targetTable, lstTableData);
-                    retval = await this.dumpDataPostges(targetTable.name);
+                    retval = await this.dumpDataPostges(targetTable.name, targetTable.fields.map((field) => field.name));
                     fs.unlinkSync(`./csv/${targetTable.name}.data`);
                 } else if (this.config.technology == 'mysql') {
                     retval = await this.dumpDataMysqlJson(targetTable, lstTableData);
                 };
+                if (this.pgTransactionClient && this.config.technology == 'postgres' && !targetTable.name.startsWith('_')) {
+                    this.pgTransactionRowCounts[targetTable.name] = retval;
+                }
                 resolve(retval);
             } catch (err) {
                 logger.logError(`database.bulkLoadTableJson(${targetTable.name})`, err);
@@ -396,6 +892,9 @@ class _database {
     }
 
     async beginTransaction(): Promise<void> {
+        if (!this.supportsTransactionalSync()) {
+            return;
+        }
         if (this.pgTransactionClient) {
             throw new Error('Transaction already in progress');
         }
@@ -405,6 +904,9 @@ class _database {
     }
 
     async commitTransaction(): Promise<Record<string, number>> {
+        if (!this.supportsTransactionalSync()) {
+            return {};
+        }
         if (!this.pgTransactionClient) {
             throw new Error('No transaction in progress');
         }
@@ -420,6 +922,9 @@ class _database {
     }
 
     async rollbackTransaction(): Promise<void> {
+        if (!this.supportsTransactionalSync()) {
+            return;
+        }
         if (!this.pgTransactionClient) return;
         try {
             await this.pgTransactionClient.query('ROLLBACK');
@@ -680,9 +1185,17 @@ class _database {
 
     private executePostgres(sqlQuery: string | string[]): Promise<queryResult> {
         return new Promise<queryResult>(async (resolve, reject) => {
-            const connection = this.pgTransactionClient ?? await this.connectionPoolPostgres.connect();
-            const releaseAfter = !this.pgTransactionClient;
+            let connection: postgres.PoolClient | null = null;
+            let releaseAfter = false;
             try {
+                if (!this.pgTransactionClient && !this.connectionPoolPostgres) {
+                    await this.openConnectionPool();
+                }
+                if (!this.pgTransactionClient && !this.connectionPoolPostgres) {
+                    throw new Error('PostgreSQL connection pool is not initialized');
+                }
+                connection = this.pgTransactionClient ?? await this.connectionPoolPostgres.connect();
+                releaseAfter = !this.pgTransactionClient;
                 let rowCount = 0;
                 let data: any[] = [];
                 if (Array.isArray(sqlQuery)) { //multiple query
@@ -704,7 +1217,7 @@ class _database {
                 reject(err);
                 logger.logError('database.executePostgres()', err);
             } finally {
-                if (releaseAfter) connection.release();
+                if (releaseAfter && connection) connection.release();
             }
         });
     }
@@ -762,21 +1275,18 @@ class _database {
         });
     }
 
-    private dumpDataPostges(targetTable: string): Promise<number> {
+    private dumpDataPostges(targetTable: string, fieldNames?: string[]): Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
             const connection = this.pgTransactionClient ?? await this.connectionPoolPostgres.connect();
             const releaseAfter = !this.pgTransactionClient;
             try {
                 const sourceStream = fs.createReadStream(`./csv/${targetTable}.data`, 'utf-8');
-                let ptrCopyQueryStream = pgLoadInto(`copy ${targetTable} from stdin csv header;`);
+                const columnClause = Array.isArray(fieldNames) && fieldNames.length
+                    ? `(${fieldNames.join(',')})`
+                    : '';
+                let ptrCopyQueryStream = pgLoadInto(`copy ${targetTable} ${columnClause} from stdin csv header;`);
                 const targetStream = connection.query(ptrCopyQueryStream);
                 await pipeline(sourceStream, targetStream);
-                if (this.pgTransactionClient) {
-                    const countResult = await connection.query<{ count: string }>(
-                        `SELECT COUNT(*) as count FROM ${targetTable}`
-                    );
-                    this.pgTransactionRowCounts[targetTable] = parseInt(countResult.rows[0].count, 10);
-                }
                 resolve(ptrCopyQueryStream.rowCount || 0);
             } catch (err) {
                 reject(err);

@@ -10,7 +10,7 @@
         "loadmethod": "file"
     },
     "tally": {
-        "definition": "tally-export-config.yaml",
+        "definition": "tally-export-config-incremental.yaml",
         "server": "TALLY_SERVER_IP",
         "port": 9000,
         "fromdate": "auto",

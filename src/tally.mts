@@ -9,6 +9,17 @@ import { utility } from './utility.mjs';
 import { logger } from './logger.mjs';
 import { database } from './database.mjs';
 import { tallyConfig, tableConfigYAML, companyInfo, collectionConfigJSON, tableConfigJSON, fieldConfigJSON } from './definition.mjs';
+import { buildCoverageDefinitionHash, capturesCancelledVouchers, capturesOptionalVouchers, normalizeCoverageList } from './source-completeness.mjs';
+
+interface syncCoverageDescriptor {
+    tableName: string;
+    collectionName: string;
+    tableNature: string;
+    isMaster: boolean;
+    fieldList: string[];
+    fetchList: string[];
+    filters: string[];
+}
 
 class _tally {
 
@@ -25,6 +36,9 @@ class _tally {
     private lstCollectionDataCache: Map<string, any[]> = new Map<string, any[]>();
 
     private currentSyncLogId: number | null = null;
+    private fullSyncTrackedTables: string[] = [];
+    private syncCoverageDescriptors: syncCoverageDescriptor[] = [];
+    private runtimeCoverageFilters: Map<string, string[]> = new Map<string, string[]>();
 
     //hidden commandline flags
     private importMaster = true;
@@ -38,7 +52,7 @@ class _tally {
             this.config = JSON.parse(fs.readFileSync('./config.json', 'utf8'))['tally'];
         } catch (err) {
             this.config = {
-                definition: 'tally-export-config.yaml',
+                definition: 'tally-export-config-incremental.yaml',
                 server: 'localhost',
                 port: 9000,
                 company: '',
@@ -79,55 +93,64 @@ class _tally {
         }
     }
 
-    importData(): Promise<void> {
-        return new Promise<void>(async (resolve, reject) => {
-            try {
+    async importData(): Promise<void> {
+        try {
 
-                logger.logMessage('Tally to Database | version: 1.0.41');
+            logger.logMessage('Tally to Database | version: 1.0.41');
 
-                let pathTallyExportDefinition = this.config.definition
-                if (pathTallyExportDefinition.endsWith('.yaml')) {
-                    //Load YAML export definition file
-                    if (fs.existsSync(`./${pathTallyExportDefinition}`)) {
-                        let objYAML: any = yaml.load(fs.readFileSync(`./${pathTallyExportDefinition}`, 'utf-8'));
-                        this.lstTableMasterYaml = objYAML['master'];
-                        this.lstTableTransactionYaml = objYAML['transaction'];
-                        this.lstTableYaml = [...this.lstTableMasterYaml, ...this.lstTableTransactionYaml];
-                    } else {
-                        logger.logMessage('Tally export definition file specified does not exists or is invalid');
-                        resolve();
-                        return;
-                    }
+            let pathTallyExportDefinition = this.resolveDefinitionPath(this.config.definition);
+            if (pathTallyExportDefinition.endsWith('.yaml')) {
+                //Load YAML export definition file
+                if (fs.existsSync(`./${pathTallyExportDefinition}`)) {
+                    let objYAML: any = yaml.load(fs.readFileSync(`./${pathTallyExportDefinition}`, 'utf-8'));
+                    this.lstTableMasterYaml = objYAML['master'];
+                    this.lstTableTransactionYaml = objYAML['transaction'];
+                    this.lstTableYaml = [...this.lstTableMasterYaml, ...this.lstTableTransactionYaml];
+                    this.syncCoverageDescriptors = this.buildYamlCoverageDescriptors(pathTallyExportDefinition);
+                    this.runtimeCoverageFilters.clear();
                 } else {
-                    this.isDefinitionYAML = false;
-                    this.lstCollectionDataCache.clear(); //clear cache
-                    //Load JSON collection definition file
-                    if (fs.existsSync(`./${pathTallyExportDefinition.replace('.yaml', '.json')}`)) {
-                        let objJSON: any = JSON.parse(fs.readFileSync(`./${pathTallyExportDefinition.replace('.yaml', '.json')}`, 'utf-8'));
-                        this.lstTallyCollectionDefinitionJson = objJSON['collections'];
-                        this.lstDatabaseTableDefinitionJson = objJSON['tables'];
-
-                    } else {
-                        logger.logMessage('Tally collection definition file specified does not exists or is invalid');
-                        resolve();
-                        return;
-                    }
+                    logger.logMessage('Tally export definition file specified does not exists or is invalid');
+                    return;
                 }
+            } else {
+                this.isDefinitionYAML = false;
+                this.lstCollectionDataCache.clear(); //clear cache
+                //Load JSON collection definition file
+                if (fs.existsSync(`./${pathTallyExportDefinition.replace('.yaml', '.json')}`)) {
+                    let objJSON: any = JSON.parse(fs.readFileSync(`./${pathTallyExportDefinition.replace('.yaml', '.json')}`, 'utf-8'));
+                    this.lstTallyCollectionDefinitionJson = objJSON['collections'];
+                    this.lstDatabaseTableDefinitionJson = objJSON['tables'];
+                    this.syncCoverageDescriptors = [];
+                    this.runtimeCoverageFilters.clear();
 
-                await database.openConnectionPool();
+                } else {
+                    logger.logMessage('Tally collection definition file specified does not exists or is invalid');
+                    return;
+                }
+            }
 
-                // Determine sync type and alter_id cursor (before transaction)
-                const syncType = this.config.sync === 'incremental' ? 'incremental' : 'full';
-                const alterIdFrom: number = syncType === 'incremental'
-                    ? (await database.executeScalar<number>(
-                          `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
-                      ) ?? 0)
-                    : 0;
+            await database.openConnectionPool();
+            const useTransaction = database.supportsTransactionalSync();
 
+            // Determine sync type and alter_id cursor (before transaction)
+            const syncType = this.config.sync === 'incremental' ? 'incremental' : 'full';
+            const alterIdFrom: number = syncType === 'incremental'
+                ? (await database.executeScalar<number>(
+                      `SELECT coalesce(max(cast(value as bigint)), 0) FROM config WHERE name = 'Last AlterID Transaction'`
+                  ) ?? 0)
+                : 0;
+
+            if (database.supportsSyncLog()) {
+                await database.ensureSyncLogTable();
                 this.currentSyncLogId = await this.writeSyncLogStart(syncType, alterIdFrom);
+            } else {
+                this.currentSyncLogId = null;
+            }
 
-                try {
+            try {
+                if (useTransaction) {
                     await database.beginTransaction();
+                }
 
                 if (this.config.sync == 'incremental') {
 
@@ -179,6 +202,8 @@ class _tally {
                                 await database.createDatabaseTables(this.config.sync);
                             }
                         }
+                        await database.ensureMirrorOrderTables();
+                        await database.ensureMirrorAuditTables();
 
                         //acquire last AlterID of master & transaction from last sync version of Database
                         logger.logMessage('Acquiring last AlterID from database');
@@ -209,11 +234,13 @@ class _tally {
                         //terminate sync if nothing has changed
                         if (!flgIsMasterChanged && !flgIsTransactionChanged) {
                             logger.logMessage('  No change found');
-                            await database.commitTransaction();
-                            if (this.currentSyncLogId) {
-                                await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdFrom, {});
+                            const rowCounts = useTransaction ? await database.commitTransaction() : {};
+                            if (this.currentSyncLogId !== null) {
+                                await this.writeSyncCoverage(syncType, rowCounts);
+                                await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdFrom, rowCounts);
+                                this.currentSyncLogId = null;
                             }
-                            return resolve();
+                            return;
                         }
 
                         //iterate through all the Primary type of tables
@@ -248,13 +275,19 @@ class _tally {
                                 filters: activeTable.filters
                             };
                             await this.processReport('_diff', tempTable, configTallyXML);
-                            await database.bulkLoad(path.join(process.cwd(), `./csv/_diff.data`), '_diff', tempTable.fields.map(p => p.type)); //upload to temporary table
+                            await database.bulkLoad(
+                                path.join(process.cwd(), `./csv/_diff.data`),
+                                '_diff',
+                                tempTable.fields.map(p => p.type),
+                                tempTable.fields.map(p => p.name)
+                            ); //upload to temporary table
                             fs.unlinkSync(path.join(process.cwd(), `./csv/_diff.data`)); //delete temporary file
 
                             //insert into delete list rows there were deleted in current data compared to previous one
                             await database.executeNonQuery(`insert into _delete select guid from ${activeTable.name} where guid not in (select guid from _diff);`);
                             //insert into delete list rows that were modified in current data (as they will be imported freshly)
                             await database.executeNonQuery(`insert into _delete select t.guid from ${activeTable.name} as t join _diff as s on s.guid = t.guid where s.alterid <> t.alterid;`);
+                            await this.recordTrackedDeleteEvents(activeTable.name, syncType);
 
                             //remove delete list rows from the source table
                             await database.executeNonQuery(`delete from ${activeTable.name} where guid in (select guid from _delete)`);
@@ -280,8 +313,14 @@ class _tally {
                                 activeTable.filters.push(`$AlterID > ${lastAlterIdMasterDatabase}`);
 
                                 let targetTable = activeTable.name;
+                                this.runtimeCoverageFilters.set(targetTable, normalizeCoverageList(activeTable.filters));
                                 await this.processReport(targetTable, activeTable, configTallyXML);
-                                await database.bulkLoad(path.join(process.cwd(), `./csv/${targetTable}.data`), targetTable, activeTable.fields.map(p => p.type));
+                                await database.bulkLoad(
+                                    path.join(process.cwd(), `./csv/${targetTable}.data`),
+                                    targetTable,
+                                    activeTable.fields.map(p => p.type),
+                                    activeTable.fields.map(p => p.name)
+                                );
                                 fs.unlinkSync(path.join(process.cwd(), `./csv/${targetTable}.data`)); //delete raw file
                                 logger.logMessage('  syncing table %s', targetTable);
                             }
@@ -298,8 +337,14 @@ class _tally {
                                 activeTable.filters.push(`$AlterID > ${lastAlterIdTransactionDatabase}`);
 
                                 let targetTable = activeTable.name;
+                                this.runtimeCoverageFilters.set(targetTable, normalizeCoverageList(activeTable.filters));
                                 await this.processReport(targetTable, activeTable, configTallyXML);
-                                await database.bulkLoad(path.join(process.cwd(), `./csv/${targetTable}.data`), targetTable, activeTable.fields.map(p => p.type));
+                                await database.bulkLoad(
+                                    path.join(process.cwd(), `./csv/${targetTable}.data`),
+                                    targetTable,
+                                    activeTable.fields.map(p => p.type),
+                                    activeTable.fields.map(p => p.name)
+                                );
                                 fs.unlinkSync(path.join(process.cwd(), `./csv/${targetTable}.data`)); //delete raw file
                                 logger.logMessage('  syncing table %s', targetTable);
                             }
@@ -363,7 +408,12 @@ class _tally {
                                 };
 
                                 await this.processReport('_vchnumber', tempTable, configTallyXML);
-                                await database.bulkLoad(path.join(process.cwd(), `./csv/_vchnumber.data`), '_vchnumber', tempTable.fields.map(p => p.type)); //upload to temporary table
+                                await database.bulkLoad(
+                                    path.join(process.cwd(), `./csv/_vchnumber.data`),
+                                    '_vchnumber',
+                                    tempTable.fields.map(p => p.type),
+                                    tempTable.fields.map(p => p.name)
+                                ); //upload to temporary table
                                 fs.unlinkSync(path.join(process.cwd(), `./csv/_vchnumber.data`)); //delete temporary file
 
                                 //update voucher number with fresh copy
@@ -384,6 +434,8 @@ class _tally {
                         await database.executeNonQuery('truncate table _diff ;');
                         await database.executeNonQuery('truncate table _delete ;');
                         await database.executeNonQuery('truncate table _vchnumber ;');
+
+                        await this.refreshVoucherStateSnapshot(configTallyXML);
                     }
                     else
                         logger.logMessage('Incremental Sync is supported only for SQL Server / MySQL / PostgreSQL');
@@ -472,6 +524,12 @@ class _tally {
                             await database.createDatabaseTables(this.config.sync);
                         }
                     }
+                    await database.ensureMirrorOrderTables();
+                    await database.ensureMirrorAuditTables();
+
+                    if (this.truncateTable) {
+                        await this.capturePreFullSyncAuditState();
+                    }
 
                     if (/^(mssql|mysql|postgres|bigquery|csv)$/g.test(database.config.technology)) {
                         //update active company information before starting import
@@ -493,6 +551,7 @@ class _tally {
                             let timestampBegin = Date.now();
                             let targetTable = lstTables[i];
                             let targetTableConfig = this.lstTableYaml.filter(p => p.name == targetTable)[0];
+                            this.runtimeCoverageFilters.set(targetTable, normalizeCoverageList(targetTableConfig.filters));
                             await this.processReport(targetTable, targetTableConfig, configTallyXML);
                             let timestampEnd = Date.now();
                             let elapsedSecond = utility.Number.round((timestampEnd - timestampBegin) / 1000, 3);
@@ -582,10 +641,17 @@ class _tally {
                             for (let i = 0; i < lstTables.length; i++) {
                                 let targetTable = lstTables[i];
                                 let targetTableConfig = this.lstTableYaml.filter(p => p.name == targetTable)[0];
-                                let rowCount = await database.bulkLoad(path.join(process.cwd(), `./csv/${targetTable}.data`), targetTable, targetTableConfig.fields.map(p => p.type));
+                                let rowCount = await database.bulkLoad(
+                                    path.join(process.cwd(), `./csv/${targetTable}.data`),
+                                    targetTable,
+                                    targetTableConfig.fields.map(p => p.type),
+                                    targetTableConfig.fields.map(p => p.name)
+                                );
                                 fs.unlinkSync(path.join(process.cwd(), `./csv/${targetTable}.data`)); //delete raw file
                                 logger.logMessage('  %s: imported %d rows', targetTable, rowCount);
                             }
+
+                            await this.refreshVoucherStateSnapshot(configTallyXML);
                         } else {
                             // perform in-memory collection data based bulk import into database
                             logger.logMessage('Loading collections to database tables [%s]', new Date().toLocaleString());
@@ -638,44 +704,857 @@ class _tally {
                     } else;
                 }
 
+                    await this.refreshAuditTables(syncType);
+
                     // After all tables complete, get current alter_id from Tally
                     const alterIdTo: number = await this.getCurrentTransactionAlterId();
 
-                    const rowCounts = await database.commitTransaction();
-                    if (this.currentSyncLogId) {
+                    const rowCounts = useTransaction ? await database.commitTransaction() : {};
+                    if (this.currentSyncLogId !== null) {
+                        await this.writeSyncCoverage(syncType, rowCounts);
                         await this.writeSyncLogEnd(this.currentSyncLogId, 'success', alterIdTo, rowCounts);
+                        this.currentSyncLogId = null;
                     }
 
                 } catch (innerErr: unknown) {
-                    await database.rollbackTransaction();
+                    if (useTransaction) {
+                        await database.rollbackTransaction();
+                    }
                     const msg = innerErr instanceof Error ? innerErr.message : String(innerErr);
-                    if (this.currentSyncLogId) {
+                    if (this.currentSyncLogId !== null) {
                         await this.writeSyncLogEnd(this.currentSyncLogId, 'failed', 0, {}, msg);
+                        this.currentSyncLogId = null;
                     }
                     throw innerErr;
-                }
-
-                resolve();
-            } catch (err) {
-                logger.logError('tally.importData()', err);
-                reject(err);
             } finally {
                 await database.closeConnectionPool();
             }
-        });
+        } catch (err) {
+            logger.logError('tally.importData()', err);
+            throw err;
+        }
     }
 
-    private async writeSyncLogStart(syncType: 'full' | 'incremental', alterIdFrom: number): Promise<number> {
-        // Returns 0 on fresh install before sync_log table exists — sync_log writes are skipped via null-guard
+    private resolveDefinitionPath(requestedPath: string): string {
+        const normalizedPath = path.basename(requestedPath);
+        const auditRichDefinition = 'tally-export-config-incremental.yaml';
+        if (
+            this.config.sync !== 'incremental'
+            && normalizedPath == 'tally-export-config.yaml'
+            && fs.existsSync(`./${auditRichDefinition}`)
+        ) {
+            logger.logMessage('Using audit-rich definition %s for full sync', auditRichDefinition);
+            return auditRichDefinition;
+        }
+        return requestedPath;
+    }
+
+    private buildYamlCoverageDescriptors(definitionPath: string): syncCoverageDescriptor[] {
+        let retval: syncCoverageDescriptor[] = [];
+
+        const mapTable = (tableConfig: tableConfigYAML, isMaster: boolean): syncCoverageDescriptor => ({
+            tableName: tableConfig.name,
+            collectionName: tableConfig.collection,
+            tableNature: tableConfig.nature,
+            isMaster,
+            fieldList: tableConfig.fields.map((field) => field.name),
+            fetchList: normalizeCoverageList(tableConfig.fetch),
+            filters: normalizeCoverageList(tableConfig.filters)
+        });
+
+        retval.push(...this.lstTableMasterYaml.map((table) => mapTable(table, true)));
+        retval.push(...this.lstTableTransactionYaml.map((table) => mapTable(table, false)));
+
+        retval.push({
+            tableName: 'trn_voucher_state',
+            collectionName: 'Voucher',
+            tableNature: 'Snapshot',
+            isMaster: false,
+            fieldList: [
+                'guid',
+                'voucher_key',
+                'alterid',
+                'date',
+                'voucher_type',
+                '_voucher_type',
+                'voucher_number',
+                'reference_number',
+                'reference_date',
+                'narration',
+                'party_name',
+                '_party_name',
+                'place_of_supply',
+                'is_invoice',
+                'is_accounting_voucher',
+                'is_inventory_voucher',
+                'is_order_voucher',
+                'is_optional',
+                'is_cancelled'
+            ],
+            fetchList: normalizeCoverageList([
+                'AlterId',
+                'VoucherKey',
+                'Narration',
+                'PartyLedgerName',
+                'PlaceOfSupply',
+                'Reference',
+                'ReferenceDate',
+                'IsOptional',
+                'IsCancelled'
+            ]),
+            filters: []
+        });
+
+        retval.push({
+            tableName: 'mst_company',
+            collectionName: 'Company',
+            tableNature: 'Snapshot',
+            isMaster: true,
+            fieldList: [
+                'company_guid',
+                'company_name',
+                'books_from',
+                'period_from',
+                'period_to',
+                'last_voucher_date',
+                'mailing_address',
+                'state_name',
+                'country_name',
+                'pincode',
+                'email',
+                'vat_tin',
+                'last_alter_id_master',
+                'last_alter_id_transaction'
+            ],
+            fetchList: normalizeCoverageList([
+                'BooksFrom',
+                'LastVoucherDate',
+                'AltMstId',
+                'AltVchId',
+                'Address',
+                'StateName',
+                'CountryName',
+                'Pincode',
+                'Email',
+                'VATTINNumber'
+            ]),
+            filters: ['$$IsEqual:##SVCurrentCompany:$Name']
+        });
+
+        return retval.map((descriptor) => ({
+            ...descriptor,
+            fieldList: normalizeCoverageList(descriptor.fieldList),
+            fetchList: normalizeCoverageList(descriptor.fetchList),
+            filters: normalizeCoverageList(descriptor.filters)
+        }));
+    }
+
+    private getDeletedMasterTables(): string[] {
+        return [
+            'mst_group',
+            'mst_ledger',
+            'mst_vouchertype',
+            'mst_uom',
+            'mst_godown',
+            'mst_stock_category',
+            'mst_stock_group',
+            'mst_stock_item',
+            'mst_cost_category',
+            'mst_cost_centre',
+            'mst_attendance_type',
+            'mst_employee',
+            'mst_payhead'
+        ];
+    }
+
+    private getTrackedTempTableName(tableName: string): string {
+        return `_prev_${tableName}`;
+    }
+
+    private getCurrentSyncLogIdSql(): string {
+        return this.currentSyncLogId === null ? 'NULL' : this.currentSyncLogId.toString();
+    }
+
+    private async capturePreFullSyncAuditState(): Promise<void> {
+        if (!database.supportsMirrorAuditTables()) {
+            this.fullSyncTrackedTables = [];
+            return;
+        }
+
+        const existingTables = await database.listDatabaseTables();
+        const trackedTables = ['trn_voucher', ...this.getDeletedMasterTables()].filter((tableName) =>
+            existingTables.includes(tableName)
+        );
+
+        this.fullSyncTrackedTables = trackedTables;
+        for (const tableName of trackedTables) {
+            const tempTableName = this.getTrackedTempTableName(tableName);
+            await database.executeNonQuery(`DROP TABLE IF EXISTS ${tempTableName}`);
+            await database.executeNonQuery(`CREATE TEMP TABLE ${tempTableName} AS SELECT * FROM ${tableName}`);
+        }
+    }
+
+    private async recordTrackedDeleteEvents(tableName: string, syncType: 'full' | 'incremental'): Promise<void> {
+        if (!database.supportsMirrorAuditTables()) {
+            return;
+        }
+
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        const statements: string[] = [];
+
+        if (tableName == 'trn_voucher') {
+            statements.push(
+                `INSERT INTO trn_voucher_deleted
+                    (guid, alterid, voucher_date, voucher_number, sync_type, sync_log_id, deleted_at, row_json)
+                 SELECT
+                    t.guid,
+                    t.alterid,
+                    t.date,
+                    t.voucher_number,
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    row_to_json(t)::jsonb
+                 FROM trn_voucher AS t
+                 JOIN _delete AS d ON d.guid = t.guid`,
+                `INSERT INTO trn_voucher_history
+                    (guid, alterid, voucher_date, voucher_number, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                 SELECT
+                    t.guid,
+                    t.alterid,
+                    t.date,
+                    t.voucher_number,
+                    'DELETE',
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    md5(row_to_json(t)::text),
+                    row_to_json(t)::jsonb
+                 FROM trn_voucher AS t
+                 JOIN _delete AS d ON d.guid = t.guid`
+            );
+        }
+
+        if (tableName.startsWith('mst_')) {
+            statements.push(
+                `INSERT INTO mst_deleted
+                    (source_table, guid, name, alterid, sync_type, sync_log_id, deleted_at, row_json)
+                 SELECT
+                    '${tableName}',
+                    t.guid,
+                    COALESCE(t.name, ''),
+                    t.alterid,
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    row_to_json(t)::jsonb
+                 FROM ${tableName} AS t
+                 JOIN _delete AS d ON d.guid = t.guid`
+            );
+
+            if (tableName == 'mst_ledger') {
+                statements.push(
+                    `INSERT INTO mst_ledger_history
+                        (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                     SELECT
+                        t.guid,
+                        t.name,
+                        t.alterid,
+                        'DELETE',
+                        '${syncType}',
+                        ${syncLogIdSql},
+                        now(),
+                        md5(row_to_json(t)::text),
+                        row_to_json(t)::jsonb
+                     FROM mst_ledger AS t
+                     JOIN _delete AS d ON d.guid = t.guid`
+                );
+            }
+
+            if (tableName == 'mst_stock_item') {
+                statements.push(
+                    `INSERT INTO mst_stock_item_history
+                        (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                     SELECT
+                        t.guid,
+                        t.name,
+                        t.alterid,
+                        'DELETE',
+                        '${syncType}',
+                        ${syncLogIdSql},
+                        now(),
+                        md5(row_to_json(t)::text),
+                        row_to_json(t)::jsonb
+                     FROM mst_stock_item AS t
+                     JOIN _delete AS d ON d.guid = t.guid`
+                );
+            }
+        }
+
+        if (statements.length) {
+            await database.executeNonQuery(statements);
+        }
+    }
+
+    private async refreshAuditTables(syncType: 'full' | 'incremental'): Promise<void> {
+        if (!database.supportsMirrorAuditTables()) {
+            return;
+        }
+
+        if (syncType == 'full' && this.truncateTable) {
+            await this.recordFullSyncDeleteEvents(syncType);
+        }
+
+        await this.recordCurrentHistoryRows(syncType);
+        await this.rebuildBillStatusSnapshot();
+        await this.rebuildWorkflowLinks();
+        await this.rebuildGstAndCurrencySnapshots();
+    }
+
+    private getVoucherStateTableConfig(): tableConfigYAML {
+        return {
+            name: 'trn_voucher_state',
+            collection: 'Voucher',
+            nature: 'Snapshot',
+            fetch: [
+                'AlterId',
+                'VoucherKey',
+                'Narration',
+                'PartyLedgerName',
+                'PlaceOfSupply',
+                'Reference',
+                'ReferenceDate',
+                'IsOptional',
+                'IsCancelled'
+            ],
+            fields: [
+                { name: 'guid', field: 'Guid', type: 'text' },
+                { name: 'voucher_key', field: 'VoucherKey', type: 'text' },
+                { name: 'alterid', field: 'AlterId', type: 'number' },
+                { name: 'date', field: 'Date', type: 'date' },
+                { name: 'voucher_type', field: 'VoucherTypeName', type: 'text' },
+                { name: '_voucher_type', field: '$Guid:VoucherType:$VoucherTypeName', type: 'text' },
+                { name: 'voucher_number', field: 'VoucherNumber', type: 'text' },
+                { name: 'reference_number', field: 'Reference', type: 'text' },
+                { name: 'reference_date', field: 'ReferenceDate', type: 'date' },
+                { name: 'narration', field: 'Narration', type: 'text' },
+                { name: 'party_name', field: 'PartyLedgerName', type: 'text' },
+                { name: '_party_name', field: 'if $$IsEmpty:$PartyLedgerName then "" else $Guid:Ledger:$PartyLedgerName', type: 'text' },
+                { name: 'place_of_supply', field: 'PlaceOfSupply', type: 'text' },
+                { name: 'is_invoice', field: 'IsInvoice', type: 'logical' },
+                { name: 'is_accounting_voucher', field: 'if $$IsAccountingVch:$VoucherTypeName then 1 else 0', type: 'logical' },
+                { name: 'is_inventory_voucher', field: 'if $$IsInventoryVch:$VoucherTypeName then 1 else 0', type: 'logical' },
+                { name: 'is_order_voucher', field: 'if $$IsOrderVch:$VoucherTypeName then 1 else 0', type: 'logical' },
+                { name: 'is_optional', field: 'IsOptional', type: 'logical' },
+                { name: 'is_cancelled', field: 'IsCancelled', type: 'logical' }
+            ]
+        };
+    }
+
+    private async refreshVoucherStateSnapshot(substitutions: Map<string, any>): Promise<void> {
+        if (!database.supportsMirrorAuditTables()) {
+            return;
+        }
+
+        const tableConfig = this.getVoucherStateTableConfig();
+        this.runtimeCoverageFilters.set(tableConfig.name, normalizeCoverageList(tableConfig.filters));
+        await this.processReport(tableConfig.name, tableConfig, substitutions);
+        await database.executeNonQuery('TRUNCATE TABLE trn_voucher_state');
+        const rowCount = await database.bulkLoad(
+            path.join(process.cwd(), `./csv/${tableConfig.name}.data`),
+            tableConfig.name,
+            tableConfig.fields.map((field) => field.type),
+            tableConfig.fields.map((field) => field.name)
+        );
+        fs.unlinkSync(path.join(process.cwd(), `./csv/${tableConfig.name}.data`));
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        await database.executeNonQuery(
+            `UPDATE trn_voucher_state
+             SET source_sync_log_id = ${syncLogIdSql},
+                 last_synced_at = now()`
+        );
+        logger.logMessage('  synced table %s (%d rows)', tableConfig.name, rowCount);
+    }
+
+    private async writeSyncCoverage(syncType: 'full' | 'incremental', rowCounts: Record<string, number>): Promise<void> {
+        if (!database.supportsMirrorAuditTables() || this.currentSyncLogId === null || !this.syncCoverageDescriptors.length) {
+            return;
+        }
+
+        const escapeValue = (value: string): string => value.replace(/'/g, "''");
+        const statements: string[] = [];
+        const definitionPath = this.resolveDefinitionPath(this.config.definition);
+
+        for (const descriptor of this.syncCoverageDescriptors) {
+            const effectiveFilters = this.runtimeCoverageFilters.get(descriptor.tableName) ?? descriptor.filters;
+            const rowCountAfterRaw = await database.executeScalar<any>(
+                `SELECT COUNT(*) FROM ${descriptor.tableName}`
+            );
+            const rowCountAfter = Number(rowCountAfterRaw ?? 0);
+            const rowsLoaded = Number(rowCounts[descriptor.tableName] ?? 0);
+            const filterText = effectiveFilters.join(' AND ');
+            const fetchList = descriptor.fetchList.join(',');
+            const fieldList = descriptor.fieldList.join(',');
+            const definitionHash = buildCoverageDefinitionHash({
+                tableName: descriptor.tableName,
+                collectionName: descriptor.collectionName,
+                definitionPath,
+                fieldList: descriptor.fieldList,
+                fetchList: descriptor.fetchList,
+                filters: effectiveFilters
+            });
+
+            statements.push(
+                `INSERT INTO sync_table_coverage
+                    (sync_log_id, sync_type, table_name, collection_name, table_nature, is_master, rows_loaded, row_count_after, definition_path, definition_hash, field_list, fetch_list, filter_text, captures_cancelled, captures_optional, recorded_at)
+                 VALUES
+                    (${this.currentSyncLogId},
+                     '${syncType}',
+                     '${escapeValue(descriptor.tableName)}',
+                     '${escapeValue(descriptor.collectionName)}',
+                     '${escapeValue(descriptor.tableNature)}',
+                     ${descriptor.isMaster ? 1 : 0},
+                     ${rowsLoaded},
+                     ${rowCountAfter},
+                     '${escapeValue(definitionPath)}',
+                     '${definitionHash}',
+                     '${escapeValue(fieldList)}',
+                     '${escapeValue(fetchList)}',
+                     '${escapeValue(filterText)}',
+                     ${capturesCancelledVouchers(effectiveFilters) ? 1 : 0},
+                     ${capturesOptionalVouchers(effectiveFilters) ? 1 : 0},
+                     now())`
+            );
+        }
+
+        try {
+            await database.executeNonQuery(statements);
+        } catch (err) {
+            logger.logMessage(
+                'Unable to write sync_table_coverage entries: %s',
+                err instanceof Error ? err.message : String(err)
+            );
+        }
+    }
+
+    private async recordFullSyncDeleteEvents(syncType: 'full' | 'incremental'): Promise<void> {
+        if (!database.supportsMirrorAuditTables() || !this.fullSyncTrackedTables.length) {
+            return;
+        }
+
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+
+        if (this.fullSyncTrackedTables.includes('trn_voucher')) {
+            const tempTableName = this.getTrackedTempTableName('trn_voucher');
+            await database.executeNonQuery([
+                `INSERT INTO trn_voucher_deleted
+                    (guid, alterid, voucher_date, voucher_number, sync_type, sync_log_id, deleted_at, row_json)
+                 SELECT
+                    p.guid,
+                    p.alterid,
+                    p.date,
+                    p.voucher_number,
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    row_to_json(p)::jsonb
+                 FROM ${tempTableName} AS p
+                 LEFT JOIN trn_voucher AS c ON c.guid = p.guid
+                 WHERE c.guid IS NULL`,
+                `INSERT INTO trn_voucher_history
+                    (guid, alterid, voucher_date, voucher_number, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                 SELECT
+                    p.guid,
+                    p.alterid,
+                    p.date,
+                    p.voucher_number,
+                    'DELETE',
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    md5(row_to_json(p)::text),
+                    row_to_json(p)::jsonb
+                 FROM ${tempTableName} AS p
+                 LEFT JOIN trn_voucher AS c ON c.guid = p.guid
+                 WHERE c.guid IS NULL`
+            ]);
+        }
+
+        for (const tableName of this.getDeletedMasterTables()) {
+            if (!this.fullSyncTrackedTables.includes(tableName)) {
+                continue;
+            }
+
+            const tempTableName = this.getTrackedTempTableName(tableName);
+            const statements = [
+                `INSERT INTO mst_deleted
+                    (source_table, guid, name, alterid, sync_type, sync_log_id, deleted_at, row_json)
+                 SELECT
+                    '${tableName}',
+                    p.guid,
+                    COALESCE(p.name, ''),
+                    p.alterid,
+                    '${syncType}',
+                    ${syncLogIdSql},
+                    now(),
+                    row_to_json(p)::jsonb
+                 FROM ${tempTableName} AS p
+                 LEFT JOIN ${tableName} AS c ON c.guid = p.guid
+                 WHERE c.guid IS NULL`
+            ];
+
+            if (tableName == 'mst_ledger') {
+                statements.push(
+                    `INSERT INTO mst_ledger_history
+                        (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                     SELECT
+                        p.guid,
+                        p.name,
+                        p.alterid,
+                        'DELETE',
+                        '${syncType}',
+                        ${syncLogIdSql},
+                        now(),
+                        md5(row_to_json(p)::text),
+                        row_to_json(p)::jsonb
+                     FROM ${tempTableName} AS p
+                     LEFT JOIN mst_ledger AS c ON c.guid = p.guid
+                     WHERE c.guid IS NULL`
+                );
+            }
+
+            if (tableName == 'mst_stock_item') {
+                statements.push(
+                    `INSERT INTO mst_stock_item_history
+                        (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+                     SELECT
+                        p.guid,
+                        p.name,
+                        p.alterid,
+                        'DELETE',
+                        '${syncType}',
+                        ${syncLogIdSql},
+                        now(),
+                        md5(row_to_json(p)::text),
+                        row_to_json(p)::jsonb
+                     FROM ${tempTableName} AS p
+                     LEFT JOIN mst_stock_item AS c ON c.guid = p.guid
+                     WHERE c.guid IS NULL`
+                );
+            }
+
+            await database.executeNonQuery(statements);
+        }
+
+        this.fullSyncTrackedTables = [];
+    }
+
+    private async recordCurrentHistoryRows(syncType: 'full' | 'incremental'): Promise<void> {
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        await database.executeNonQuery([
+            `INSERT INTO trn_voucher_history
+                (guid, alterid, voucher_date, voucher_number, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+             SELECT
+                t.guid,
+                t.alterid,
+                t.date,
+                t.voucher_number,
+                'UPSERT',
+                '${syncType}',
+                ${syncLogIdSql},
+                now(),
+                md5(row_to_json(t)::text),
+                row_to_json(t)::jsonb
+             FROM trn_voucher AS t
+             LEFT JOIN LATERAL (
+                SELECT h.row_hash, h.action_type
+                FROM trn_voucher_history AS h
+                WHERE h.guid = t.guid
+                ORDER BY h.id DESC
+                LIMIT 1
+             ) AS prev ON true
+             WHERE prev.row_hash IS DISTINCT FROM md5(row_to_json(t)::text)
+                OR prev.action_type IS DISTINCT FROM 'UPSERT'`,
+            `INSERT INTO mst_ledger_history
+                (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+             SELECT
+                t.guid,
+                t.name,
+                t.alterid,
+                'UPSERT',
+                '${syncType}',
+                ${syncLogIdSql},
+                now(),
+                md5(row_to_json(t)::text),
+                row_to_json(t)::jsonb
+             FROM mst_ledger AS t
+             LEFT JOIN LATERAL (
+                SELECT h.row_hash, h.action_type
+                FROM mst_ledger_history AS h
+                WHERE h.guid = t.guid
+                ORDER BY h.id DESC
+                LIMIT 1
+             ) AS prev ON true
+             WHERE prev.row_hash IS DISTINCT FROM md5(row_to_json(t)::text)
+                OR prev.action_type IS DISTINCT FROM 'UPSERT'`,
+            `INSERT INTO mst_stock_item_history
+                (guid, name, alterid, action_type, sync_type, sync_log_id, recorded_at, row_hash, row_json)
+             SELECT
+                t.guid,
+                t.name,
+                t.alterid,
+                'UPSERT',
+                '${syncType}',
+                ${syncLogIdSql},
+                now(),
+                md5(row_to_json(t)::text),
+                row_to_json(t)::jsonb
+             FROM mst_stock_item AS t
+             LEFT JOIN LATERAL (
+                SELECT h.row_hash, h.action_type
+                FROM mst_stock_item_history AS h
+                WHERE h.guid = t.guid
+                ORDER BY h.id DESC
+                LIMIT 1
+             ) AS prev ON true
+             WHERE prev.row_hash IS DISTINCT FROM md5(row_to_json(t)::text)
+                OR prev.action_type IS DISTINCT FROM 'UPSERT'`
+        ]);
+    }
+
+    private async rebuildBillStatusSnapshot(): Promise<void> {
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        await database.executeNonQuery([
+            'TRUNCATE TABLE trn_bill_status_snapshot',
+            `WITH tbl_bill AS (
+                SELECT
+                    b.guid,
+                    b.ledger,
+                    b.name,
+                    b.amount,
+                    b.billtype,
+                    v.date AS bill_date,
+                    v.voucher_type,
+                    v.voucher_number,
+                    v.party_name
+                FROM trn_bill AS b
+                JOIN trn_voucher AS v ON v.guid = b.guid
+                WHERE v.is_order_voucher = 0
+                    AND v.is_inventory_voucher = 0
+                    AND b.billtype <> 'On Account'
+            ),
+            bill_left AS (
+                SELECT *
+                FROM tbl_bill
+                WHERE billtype IN ('New Ref', 'Advance')
+            ),
+            bill_right AS (
+                SELECT
+                    ledger,
+                    name,
+                    SUM(amount) AS amount
+                FROM tbl_bill
+                WHERE billtype = 'Agst Ref'
+                GROUP BY ledger, name
+            )
+            INSERT INTO trn_bill_status_snapshot
+                (bill_name, ledger, origin_guid, origin_voucher_type, origin_voucher_number, bill_date, party_name, bill_type, bill_amount, adjusted_amount, pending_amount, source_sync_log_id, snapshot_at)
+            SELECT
+                l.name,
+                l.ledger,
+                l.guid,
+                l.voucher_type,
+                l.voucher_number,
+                l.bill_date,
+                l.party_name,
+                l.billtype,
+                l.amount,
+                COALESCE(r.amount, 0),
+                l.amount + COALESCE(r.amount, 0),
+                ${syncLogIdSql},
+                now()
+            FROM bill_left AS l
+            LEFT JOIN bill_right AS r
+                ON r.ledger = l.ledger
+               AND r.name = l.name`
+        ]);
+    }
+
+    private async rebuildWorkflowLinks(): Promise<void> {
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        await database.executeNonQuery([
+            'TRUNCATE TABLE trn_workflow_link',
+            `WITH order_lines AS (
+                SELECT
+                    voucher_guid,
+                    voucher_date,
+                    voucher_number,
+                    party_name,
+                    item
+                FROM trn_purchase_order
+                UNION ALL
+                SELECT
+                    voucher_guid,
+                    voucher_date,
+                    voucher_number,
+                    party_name,
+                    item
+                FROM trn_sales_order
+            )
+            INSERT INTO trn_workflow_link
+                (link_type, source_voucher_guid, target_voucher_guid, source_voucher_type, target_voucher_type, source_date, target_date, party_name, item, tracking_number, order_number, source_sync_log_id, snapshot_at)
+            SELECT DISTINCT
+                'ORDER_REFERENCE',
+                o.voucher_guid,
+                v.guid,
+                ov.voucher_type,
+                v.voucher_type,
+                ov.date,
+                v.date,
+                COALESCE(v.party_name, o.party_name),
+                o.item,
+                NULL,
+                i.order_number,
+                ${syncLogIdSql},
+                now()
+            FROM order_lines AS o
+            JOIN trn_voucher AS ov
+                ON ov.guid = o.voucher_guid
+            JOIN trn_inventory AS i
+                ON i.order_number = o.voucher_number
+               AND i.item = o.item
+            JOIN trn_voucher AS v
+                ON v.guid = i.guid
+            WHERE o.voucher_guid <> v.guid`,
+            `WITH tracking_chain AS (
+                SELECT
+                    i.guid,
+                    v.voucher_type,
+                    v.date,
+                    v.party_name,
+                    i.item,
+                    i.tracking_number,
+                    LEAD(i.guid) OVER (PARTITION BY i.tracking_number, i.item ORDER BY v.date, i.guid) AS next_guid,
+                    LEAD(v.voucher_type) OVER (PARTITION BY i.tracking_number, i.item ORDER BY v.date, i.guid) AS next_voucher_type,
+                    LEAD(v.date) OVER (PARTITION BY i.tracking_number, i.item ORDER BY v.date, i.guid) AS next_date,
+                    LEAD(v.party_name) OVER (PARTITION BY i.tracking_number, i.item ORDER BY v.date, i.guid) AS next_party_name
+                FROM trn_inventory AS i
+                JOIN trn_voucher AS v
+                    ON v.guid = i.guid
+                WHERE COALESCE(i.tracking_number, '') <> ''
+            )
+            INSERT INTO trn_workflow_link
+                (link_type, source_voucher_guid, target_voucher_guid, source_voucher_type, target_voucher_type, source_date, target_date, party_name, item, tracking_number, order_number, source_sync_log_id, snapshot_at)
+            SELECT
+                'TRACKING_NUMBER',
+                guid,
+                next_guid,
+                voucher_type,
+                next_voucher_type,
+                date,
+                next_date,
+                COALESCE(party_name, next_party_name),
+                item,
+                tracking_number,
+                NULL,
+                ${syncLogIdSql},
+                now()
+            FROM tracking_chain
+            WHERE next_guid IS NOT NULL
+                AND guid <> next_guid`
+        ]);
+    }
+
+    private async rebuildGstAndCurrencySnapshots(): Promise<void> {
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        await database.executeNonQuery([
+            'TRUNCATE TABLE trn_gst_component',
+            `INSERT INTO trn_gst_component
+                (guid, voucher_date, voucher_type, voucher_number, party_name, ledger, duty_head, component_type, amount, source_sync_log_id, snapshot_at)
+             SELECT
+                a.guid,
+                v.date,
+                v.voucher_type,
+                v.voucher_number,
+                v.party_name,
+                a.ledger,
+                COALESCE(l.gst_duty_head, ''),
+                CASE
+                    WHEN upper(a.ledger) LIKE '%IGST%' THEN 'IGST'
+                    WHEN upper(a.ledger) LIKE '%CGST%' THEN 'CGST'
+                    WHEN upper(a.ledger) LIKE '%SGST%' THEN 'SGST'
+                    WHEN upper(a.ledger) LIKE '%UTGST%' THEN 'UTGST'
+                    WHEN upper(a.ledger) LIKE '%CESS%' THEN 'CESS'
+                    WHEN COALESCE(l.gst_duty_head, '') <> '' THEN upper(l.gst_duty_head)
+                    ELSE 'TAX'
+                END,
+                a.amount,
+                ${syncLogIdSql},
+                now()
+             FROM trn_accounting AS a
+             JOIN trn_voucher AS v
+                ON v.guid = a.guid
+             LEFT JOIN mst_ledger AS l
+                ON l.guid = a._ledger
+                OR (a._ledger IS NULL AND l.name = a.ledger)
+             WHERE v.is_order_voucher = 0
+                AND (
+                    upper(a.ledger) LIKE '%GST%'
+                    OR upper(a.ledger) LIKE '%CESS%'
+                    OR COALESCE(l.gst_duty_head, '') <> ''
+                    OR upper(COALESCE(l.parent, '')) = 'DUTIES & TAXES'
+                )`,
+            'TRUNCATE TABLE mst_currency',
+            `INSERT INTO mst_currency
+                (currency_code, first_voucher_date, last_voucher_date, transaction_count, forex_row_count, last_synced_at)
+             SELECT
+                a.currency,
+                MIN(v.date),
+                MAX(v.date),
+                COUNT(*),
+                COUNT(*) FILTER (WHERE COALESCE(a.amount_forex, 0) <> 0),
+                now()
+             FROM trn_accounting AS a
+             JOIN trn_voucher AS v
+                ON v.guid = a.guid
+             WHERE COALESCE(a.currency, '') <> ''
+             GROUP BY a.currency`,
+            'TRUNCATE TABLE fx_rate_snapshot',
+            `INSERT INTO fx_rate_snapshot
+                (currency_code, voucher_date, sample_count, avg_rate, min_rate, max_rate, rate_source, source_sync_log_id, snapshot_at)
+             SELECT
+                a.currency,
+                v.date,
+                COUNT(*),
+                AVG(ABS(a.amount) / NULLIF(ABS(a.amount_forex), 0)),
+                MIN(ABS(a.amount) / NULLIF(ABS(a.amount_forex), 0)),
+                MAX(ABS(a.amount) / NULLIF(ABS(a.amount_forex), 0)),
+                'IMPLIED_FROM_VOUCHER',
+                ${syncLogIdSql},
+                now()
+             FROM trn_accounting AS a
+             JOIN trn_voucher AS v
+                ON v.guid = a.guid
+             WHERE COALESCE(a.currency, '') <> ''
+                AND COALESCE(a.amount_forex, 0) <> 0
+             GROUP BY a.currency, v.date`
+        ]);
+    }
+
+    private async writeSyncLogStart(syncType: 'full' | 'incremental', alterIdFrom: number): Promise<number | null> {
         try {
             const result = await database.executeScalar<number>(
                 `INSERT INTO sync_log (sync_type, alter_id_from, status)
                  VALUES ('${syncType}', ${alterIdFrom}, 'running')
                  RETURNING id`
             );
-            return result ?? 0;
-        } catch {
-            return 0;
+            return result ?? null;
+        } catch (err) {
+            logger.logMessage(
+                'Unable to write sync_log start entry: %s',
+                err instanceof Error ? err.message : String(err)
+            );
+            return null;
         }
     }
 
@@ -686,19 +1565,26 @@ class _tally {
         rowCounts: Record<string, number>,
         errorMessage?: string
     ): Promise<void> {
-        const rowCountsJson = JSON.stringify(rowCounts).replace(/'/g, "''");
-        const errorClause = errorMessage
-            ? `, error_message = '${errorMessage.replace(/'/g, "''").substring(0, 1000)}'`
-            : '';
-        await database.executeNonQuery(
-            `UPDATE sync_log
-             SET status = '${status}',
-                 completed_at = now(),
-                 alter_id_to = ${alterIdTo},
-                 rows_upserted = '${rowCountsJson}'::jsonb
-                 ${errorClause}
-             WHERE id = ${id}`
-        );
+        try {
+            const rowCountsJson = JSON.stringify(rowCounts).replace(/'/g, "''");
+            const errorClause = errorMessage
+                ? `, error_message = '${errorMessage.replace(/'/g, "''").substring(0, 1000)}'`
+                : '';
+            await database.executeNonQuery(
+                `UPDATE sync_log
+                 SET status = '${status}',
+                     completed_at = now(),
+                     alter_id_to = ${alterIdTo},
+                     rows_upserted = '${rowCountsJson}'::jsonb
+                     ${errorClause}
+                 WHERE id = ${id}`
+            );
+        } catch (err) {
+            logger.logMessage(
+                'Unable to update sync_log completion entry: %s',
+                err instanceof Error ? err.message : String(err)
+            );
+        }
     }
 
     async getCurrentTransactionAlterId(): Promise<number> {
@@ -929,7 +1815,7 @@ class _tally {
                     return partYear + '-' + partMonth + '-' + partDay;
                 }
 
-                let xmlCompany = `<?xml version="1.0" encoding="utf-8"?><ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>TallyDatabaseLoaderReport</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>ASCII (Comma Delimited)</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><REPORT NAME="TallyDatabaseLoaderReport"><FORMS>MyForm</FORMS></REPORT><FORM NAME="MyForm"><PARTS>MyPart</PARTS></FORM><PART NAME="MyPart"><LINES>MyLine</LINES><REPEAT>MyLine : MyCollection</REPEAT><SCROLLED>Vertical</SCROLLED></PART><LINE NAME="MyLine"><FIELDS>FldGuid,FldName,FldBooksFrom,FldLastVoucherDate,FldLastAlterIdMaster,FldLastAlterIdTransaction,FldEOL</FIELDS></LINE><FIELD NAME="FldGuid"><SET>$Guid</SET></FIELD><FIELD NAME="FldName"><SET>$$StringFindAndReplace:$Name:'"':'""'</SET></FIELD><FIELD NAME="FldBooksFrom"><SET>(($$YearOfDate:$BooksFrom)*10000)+(($$MonthOfDate:$BooksFrom)*100)+(($$DayOfDate:$BooksFrom)*1)</SET></FIELD><FIELD NAME="FldLastVoucherDate"><SET>(($$YearOfDate:$LastVoucherDate)*10000)+(($$MonthOfDate:$LastVoucherDate)*100)+(($$DayOfDate:$LastVoucherDate)*1)</SET></FIELD><FIELD NAME="FldLastAlterIdMaster"><SET>$AltMstId</SET></FIELD><FIELD NAME="FldLastAlterIdTransaction"><SET>$AltVchId</SET></FIELD><FIELD NAME="FldEOL"><SET>†</SET></FIELD><COLLECTION NAME="MyCollection"><TYPE>Company</TYPE><FILTER>FilterActiveCompany</FILTER></COLLECTION><SYSTEM TYPE="Formulae" NAME="FilterActiveCompany">$$IsEqual:##SVCurrentCompany:$Name</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
+                let xmlCompany = `<?xml version="1.0" encoding="utf-8"?><ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>TallyDatabaseLoaderReport</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>ASCII (Comma Delimited)</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><REPORT NAME="TallyDatabaseLoaderReport"><FORMS>MyForm</FORMS></REPORT><FORM NAME="MyForm"><PARTS>MyPart</PARTS></FORM><PART NAME="MyPart"><LINES>MyLine</LINES><REPEAT>MyLine : MyCollection</REPEAT><SCROLLED>Vertical</SCROLLED></PART><LINE NAME="MyLine"><FIELDS>FldGuid,FldName,FldBooksFrom,FldLastVoucherDate,FldLastAlterIdMaster,FldLastAlterIdTransaction,FldStateName,FldCountryName,FldPincode,FldEmail,FldVatTin,FldAddress,FldEOL</FIELDS></LINE><FIELD NAME="FldGuid"><SET>$Guid</SET></FIELD><FIELD NAME="FldName"><SET>$$StringFindAndReplace:$Name:'"':'""'</SET></FIELD><FIELD NAME="FldBooksFrom"><SET>(($$YearOfDate:$BooksFrom)*10000)+(($$MonthOfDate:$BooksFrom)*100)+(($$DayOfDate:$BooksFrom)*1)</SET></FIELD><FIELD NAME="FldLastVoucherDate"><SET>(($$YearOfDate:$LastVoucherDate)*10000)+(($$MonthOfDate:$LastVoucherDate)*100)+(($$DayOfDate:$LastVoucherDate)*1)</SET></FIELD><FIELD NAME="FldLastAlterIdMaster"><SET>$AltMstId</SET></FIELD><FIELD NAME="FldLastAlterIdTransaction"><SET>$AltVchId</SET></FIELD><FIELD NAME="FldStateName"><SET>$$StringFindAndReplace:$StateName:'"':'""'</SET></FIELD><FIELD NAME="FldCountryName"><SET>$$StringFindAndReplace:$CountryName:'"':'""'</SET></FIELD><FIELD NAME="FldPincode"><SET>$$StringFindAndReplace:$Pincode:'"':'""'</SET></FIELD><FIELD NAME="FldEmail"><SET>$$StringFindAndReplace:$Email:'"':'""'</SET></FIELD><FIELD NAME="FldVatTin"><SET>$$StringFindAndReplace:$VATTINNumber:'"':'""'</SET></FIELD><FIELD NAME="FldAddress"><SET>$$StringFindAndReplace:(if $$IsEmpty:$Address then "" else $$FullList:Address:$Address):'"':'""'</SET></FIELD><FIELD NAME="FldEOL"><SET>†</SET></FIELD><COLLECTION NAME="MyCollection"><TYPE>Company</TYPE><FILTER>FilterActiveCompany</FILTER></COLLECTION><SYSTEM TYPE="Formulae" NAME="FilterActiveCompany">$$IsEqual:##SVCurrentCompany:$Name</SYSTEM></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
                 if (this.config.company) //replce active company with specific company name if specified
                     xmlCompany = xmlCompany.replace('##SVCurrentCompany', `"${utility.String.escapeHTML(this.config.company)}"`);
 
@@ -937,11 +1823,19 @@ class _tally {
                 if (strCompanyInfo.endsWith(',"†",\r\n')) {
                     strCompanyInfo = strCompanyInfo.replace(/\",\"†\",\r\n/g, '').substr(1);
                     let lstCompanyInfoParts = strCompanyInfo.split(/\",\"/g);
-                    let companyName = lstCompanyInfoParts[1];
-                    companyName = companyName.replace(/'/g, '\\"');
+                    let companyGuid = lstCompanyInfoParts[0].replace(/'/g, "''");
+                    let companyName = lstCompanyInfoParts[1].replace(/'/g, "''");
+                    const booksFrom = convertDateYYYYMMDD(lstCompanyInfoParts[2]);
+                    const lastVoucherDate = convertDateYYYYMMDD(lstCompanyInfoParts[3]);
+                    const stateName = (lstCompanyInfoParts[6] || '').replace(/'/g, "''");
+                    const countryName = (lstCompanyInfoParts[7] || '').replace(/'/g, "''");
+                    const pincode = (lstCompanyInfoParts[8] || '').replace(/'/g, "''");
+                    const email = (lstCompanyInfoParts[9] || '').replace(/'/g, "''");
+                    const vatTin = (lstCompanyInfoParts[10] || '').replace(/'/g, "''");
+                    const mailingAddress = (lstCompanyInfoParts[11] || '').replace(/'/g, "''");
                     if (this.config.fromdate == 'auto' || this.config.todate == 'auto') { //auto assign from/to from company info for detection mode
-                        this.config.fromdate = convertDateYYYYMMDD(lstCompanyInfoParts[2]);
-                        this.config.todate = convertDateYYYYMMDD(lstCompanyInfoParts[3]);
+                        this.config.fromdate = booksFrom;
+                        this.config.todate = lastVoucherDate;
                     }
                     let altIdMaster = parseInt(lstCompanyInfoParts[4]);
                     let altIdTransaction = parseInt(lstCompanyInfoParts[5]);
@@ -960,6 +1854,31 @@ class _tally {
                     }
                     else {
                         return reject('Invalid platform selected');
+                    }
+
+                    if (database.supportsMirrorAuditTables()) {
+                        await database.executeNonQuery(
+                            `INSERT INTO mst_company
+                                (company_guid, company_name, books_from, period_from, period_to, last_voucher_date, mailing_address, state_name, country_name, pincode, email, vat_tin, last_alter_id_master, last_alter_id_transaction, synced_at)
+                             VALUES
+                                ('${companyGuid}', '${companyName}', '${booksFrom}', '${this.config.fromdate}', '${this.config.todate}', '${lastVoucherDate}', '${mailingAddress}', '${stateName}', '${countryName}', '${pincode}', '${email}', '${vatTin}', ${altIdMaster}, ${altIdTransaction}, now())
+                             ON CONFLICT (company_guid)
+                             DO UPDATE SET
+                                company_name = EXCLUDED.company_name,
+                                books_from = EXCLUDED.books_from,
+                                period_from = EXCLUDED.period_from,
+                                period_to = EXCLUDED.period_to,
+                                last_voucher_date = EXCLUDED.last_voucher_date,
+                                mailing_address = EXCLUDED.mailing_address,
+                                state_name = EXCLUDED.state_name,
+                                country_name = EXCLUDED.country_name,
+                                pincode = EXCLUDED.pincode,
+                                email = EXCLUDED.email,
+                                vat_tin = EXCLUDED.vat_tin,
+                                last_alter_id_master = EXCLUDED.last_alter_id_master,
+                                last_alter_id_transaction = EXCLUDED.last_alter_id_transaction,
+                                synced_at = now()`
+                        );
                     }
                 }
                 else {

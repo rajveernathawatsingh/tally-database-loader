@@ -10,13 +10,8 @@ class _logger {
     private flgErrorLogged = false;
 
     constructor() {
-        if (fs.existsSync('./import-log.txt'))
-            fs.rmSync('./import-log.txt');
-        if (fs.existsSync('./error-log.txt'))
-            fs.rmSync('./error-log.txt');
-
-        this.streamMessage = fs.createWriteStream('./import-log.txt', { encoding: 'utf-8' });
-        this.streamError = fs.createWriteStream('./error-log.txt', { encoding: 'utf-8' });
+        this.streamMessage = fs.createWriteStream('./import-log.txt', { encoding: 'utf-8', flags: 'a' });
+        this.streamError = fs.createWriteStream('./error-log.txt', { encoding: 'utf-8', flags: 'a' });
     }
 
     logMessage(message: string, ...params: any[]): void {

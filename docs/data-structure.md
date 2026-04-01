@@ -53,6 +53,8 @@ Below is the mapping of few Primary table of Tally with corresponding table in U
 ## Transaction data structure in utility
 Tally has primary table named **Voucher**, which utility captures in trn_voucher. This table contains header information of any voucher like Date, Voucher Type, Voucher Number etc. From Voucher, below mentiond tables are derived
 
+Fork note: the PostgreSQL mirror also maintains **trn_voucher_state** as a separate full voucher-header snapshot. Unlike **trn_voucher**, this state table keeps optional/cancelled voucher headers too, so source completeness is preserved without changing the reporting semantics of the main live voucher mirror.
+
 ```
 trn_voucher
     |——— trn_accounting
