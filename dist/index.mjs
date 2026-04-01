@@ -39,6 +39,7 @@ async function checkStaleSyncEntries() {
         return false;
     }
     return await withDatabaseConnection(async () => {
+        await database.ensureSyncLogTable();
         let stuckCount;
         try {
             stuckCount = await database.executeScalar(`SELECT COUNT(*) FROM sync_log

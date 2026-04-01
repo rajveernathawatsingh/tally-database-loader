@@ -5,7 +5,6 @@ import { utility } from './utility.mjs';
 class _logger {
     streamMessage;
     streamError;
-    flgErrorLogged = false;
     constructor() {
         this.streamMessage = fs.createWriteStream('./import-log.txt', { encoding: 'utf-8', flags: 'a' });
         this.streamError = fs.createWriteStream('./error-log.txt', { encoding: 'utf-8', flags: 'a' });
@@ -18,27 +17,24 @@ class _logger {
         }
     }
     logError(fnInfo, err) {
-        if (!this.flgErrorLogged) {
-            this.flgErrorLogged = true;
-            let errorLog = '';
-            if (!fnInfo.endsWith(')'))
-                fnInfo += '()';
-            errorLog += `Error from ${fnInfo} at ${utility.Date.format(new Date(), 'yyyy-MM-dd HH:mm:ss')}\r\n`;
-            if (typeof err == 'string')
-                errorLog += err + '\r\n';
-            else {
-                let props = Object.getOwnPropertyNames(err);
-                for (let i = 0; i < props.length; i++) {
-                    let propName = props[i];
-                    let propValue = err[propName];
-                    if (typeof propValue == 'string')
-                        errorLog += propValue + '\r\n';
-                }
+        let errorLog = '';
+        if (!fnInfo.endsWith(')'))
+            fnInfo += '()';
+        errorLog += `Error from ${fnInfo} at ${utility.Date.format(new Date(), 'yyyy-MM-dd HH:mm:ss')}\r\n`;
+        if (typeof err == 'string')
+            errorLog += err + '\r\n';
+        else {
+            let props = Object.getOwnPropertyNames(err);
+            for (let i = 0; i < props.length; i++) {
+                let propName = props[i];
+                let propValue = err[propName];
+                if (typeof propValue == 'string')
+                    errorLog += propValue + '\r\n';
             }
-            errorLog += '-'.repeat(80) + '\r\n\r\n\r\n';
-            console.error(errorLog); //graphical console
-            this.streamError.write(errorLog);
         }
+        errorLog += '-'.repeat(80) + '\r\n\r\n\r\n';
+        console.error(errorLog); //graphical console
+        this.streamError.write(errorLog);
     }
     closeStreams() {
         this.streamMessage.close();

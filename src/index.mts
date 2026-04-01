@@ -47,6 +47,7 @@ async function checkStaleSyncEntries(): Promise<boolean> {
     }
 
     return await withDatabaseConnection(async () => {
+        await database.ensureSyncLogTable();
         let stuckCount: number;
         try {
             stuckCount = await database.executeScalar<number>(

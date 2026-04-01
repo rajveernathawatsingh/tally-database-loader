@@ -189,6 +189,25 @@ class _database {
     supportsMirrorAuditTables() {
         return this.config.technology == 'postgres';
     }
+    extractScalarValue(row) {
+        if (Array.isArray(row)) {
+            if (!row.length) {
+                return undefined;
+            }
+            let firstValue = row[0];
+            if (firstValue && typeof firstValue == 'object' && 'value' in firstValue) {
+                return firstValue.value;
+            }
+            return firstValue;
+        }
+        if (row && typeof row == 'object') {
+            let values = Object.values(row);
+            if (values.length) {
+                return values[0];
+            }
+        }
+        return row;
+    }
     setTransactionRowCount(targetTable, rowCount) {
         if (this.pgTransactionClient && this.config.technology == 'postgres' && !targetTable.startsWith('_')) {
             this.pgTransactionRowCounts[targetTable] = rowCount;
@@ -405,6 +424,7 @@ class _database {
                 is_optional smallint,
                 is_cancelled smallint
             )`,
+            `ALTER TABLE _voucherstate ALTER COLUMN voucher_key TYPE varchar(64) USING voucher_key::text`,
             `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS alterid int`,
             `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS _parent varchar(64)`,
             `ALTER TABLE mst_ledger ADD COLUMN IF NOT EXISTS alterid int`,
@@ -514,6 +534,7 @@ class _database {
                 source_sync_log_id bigint,
                 last_synced_at timestamptz NOT NULL DEFAULT now()
             )`,
+            `ALTER TABLE trn_voucher_state ALTER COLUMN voucher_key TYPE varchar(64) USING voucher_key::text`,
             `CREATE TABLE IF NOT EXISTS trn_voucher_history (
                 id bigserial PRIMARY KEY,
                 guid varchar(64) NOT NULL,
@@ -997,19 +1018,18 @@ class _database {
                 if (this.config.technology.toLowerCase() == 'mysql') {
                     let result = await this.executeMysql(sqlQuery);
                     if (Array.isArray(result.data) && result.data.length == 1) {
-                        let lstProps = Object.keys(result.data[0]);
-                        retval = result.data[0][lstProps[0]];
+                        retval = this.extractScalarValue(result.data[0]);
                     }
                 }
                 else if (this.config.technology.toLowerCase() == 'mssql') {
                     let result = await this.executeMssql(sqlQuery);
                     if (Array.isArray(result.data) && result.data.length == 1)
-                        retval = result.data[0][0].value;
+                        retval = this.extractScalarValue(result.data[0]);
                 }
                 else if (this.config.technology.toLowerCase() == 'postgres') {
                     let result = await this.executePostgres(sqlQuery);
                     if (Array.isArray(result.data) && result.data.length == 1)
-                        retval = result.data[0][0];
+                        retval = this.extractScalarValue(result.data[0]);
                 }
                 else
                     ;

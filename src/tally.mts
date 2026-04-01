@@ -385,12 +385,15 @@ class _tally {
                                 logger.logMessage('  processing voucher number updates');
                                 await database.executeNonQuery('truncate table _vchnumber;');
 
-                                //pull list of voucher numbers for all the vouchers
-                                let activeTable = this.lstTableTransactionYaml.filter(p => p.name = 'trn_voucher')[0];
-                                let lstActiveTableFilter = activeTable.filters || [];
+                                // Pull a fresh voucher-number snapshot without mutating the loaded YAML table definition.
+                                let activeTable = this.lstTableTransactionYaml.find(p => p.name === 'trn_voucher');
+                                if (!activeTable) {
+                                    throw new Error('Unable to locate trn_voucher table definition for voucher-number refresh');
+                                }
+                                let lstActiveTableFilter = Array.isArray(activeTable.filters)
+                                    ? activeTable.filters.slice(0, -1) // remove the incremental AlterID filter on the copied list
+                                    : [];
                                 lstActiveTableFilter.push('$$IsEqual:($NumberingMethod:VoucherType:$VoucherTypeName):"Automatic"');
-                                if (Array.isArray(activeTable.filters))
-                                    activeTable.filters.splice(activeTable.filters.length - 1, 1); //remove AlterID filter
                                 let tempTable: tableConfigYAML = {
                                     name: '',
                                     collection: activeTable.collection,
