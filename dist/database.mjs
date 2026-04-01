@@ -189,6 +189,11 @@ class _database {
     supportsMirrorAuditTables() {
         return this.config.technology == 'postgres';
     }
+    setTransactionRowCount(targetTable, rowCount) {
+        if (this.pgTransactionClient && this.config.technology == 'postgres' && !targetTable.startsWith('_')) {
+            this.pgTransactionRowCounts[targetTable] = rowCount;
+        }
+    }
     async ensureSyncLogTable() {
         if (!this.supportsSyncLog()) {
             return;
@@ -378,6 +383,27 @@ class _database {
             `CREATE TABLE IF NOT EXISTS _vchnumber (
                 guid varchar(64) NOT NULL,
                 voucher_number varchar(256)
+            )`,
+            `CREATE TABLE IF NOT EXISTS _voucherstate (
+                guid varchar(64) NOT NULL,
+                voucher_key varchar(64),
+                alterid bigint,
+                date date,
+                voucher_type varchar(1024),
+                _voucher_type varchar(64),
+                voucher_number varchar(64),
+                reference_number varchar(64),
+                reference_date date,
+                narration text,
+                party_name varchar(256),
+                _party_name varchar(64),
+                place_of_supply varchar(256),
+                is_invoice smallint,
+                is_accounting_voucher smallint,
+                is_inventory_voucher smallint,
+                is_order_voucher smallint,
+                is_optional smallint,
+                is_cancelled smallint
             )`,
             `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS alterid int`,
             `ALTER TABLE mst_group ADD COLUMN IF NOT EXISTS _parent varchar(64)`,

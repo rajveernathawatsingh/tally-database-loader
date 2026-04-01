@@ -291,6 +291,9 @@ class _tally {
 
                             //remove delete list rows from the source table
                             await database.executeNonQuery(`delete from ${activeTable.name} where guid in (select guid from _delete)`);
+                            if (database.supportsMirrorAuditTables() && activeTable.name == 'trn_voucher') {
+                                await database.executeNonQuery('delete from trn_voucher_state where guid in (select guid from _delete)');
+                            }
 
                             //iterate through each cascade delete table and delete modified rows for insertion of fresh copy
                             if (Array.isArray(activeTable.cascade_delete) && activeTable.cascade_delete.length) {
@@ -435,7 +438,12 @@ class _tally {
                         await database.executeNonQuery('truncate table _delete ;');
                         await database.executeNonQuery('truncate table _vchnumber ;');
 
-                        await this.refreshVoucherStateSnapshot(configTallyXML);
+                        await this.refreshVoucherStateSnapshot(
+                            configTallyXML,
+                            syncType,
+                            lastAlterIdTransactionDatabase,
+                            flgIsTransactionChanged
+                        );
                     }
                     else
                         logger.logMessage('Incremental Sync is supported only for SQL Server / MySQL / PostgreSQL');
@@ -651,7 +659,7 @@ class _tally {
                                 logger.logMessage('  %s: imported %d rows', targetTable, rowCount);
                             }
 
-                            await this.refreshVoucherStateSnapshot(configTallyXML);
+                            await this.refreshVoucherStateSnapshot(configTallyXML, syncType);
                         } else {
                             // perform in-memory collection data based bulk import into database
                             logger.logMessage('Loading collections to database tables [%s]', new Date().toLocaleString());
@@ -1051,12 +1059,78 @@ class _tally {
         };
     }
 
-    private async refreshVoucherStateSnapshot(substitutions: Map<string, any>): Promise<void> {
+    private async refreshVoucherStateSnapshot(
+        substitutions: Map<string, any>,
+        syncType: 'full' | 'incremental',
+        lastAlterIdTransactionDatabase: number = 0,
+        hasTransactionChanges: boolean = true
+    ): Promise<void> {
         if (!database.supportsMirrorAuditTables()) {
             return;
         }
 
         const tableConfig = this.getVoucherStateTableConfig();
+        const syncLogIdSql = this.getCurrentSyncLogIdSql();
+        const isIncrementalDelta = syncType == 'incremental' && hasTransactionChanges;
+
+        if (syncType == 'incremental' && !hasTransactionChanges) {
+            this.runtimeCoverageFilters.set(tableConfig.name, normalizeCoverageList(tableConfig.filters));
+            database.setTransactionRowCount(tableConfig.name, 0);
+            logger.logMessage('  synced table %s (0 changed rows)', tableConfig.name);
+            return;
+        }
+
+        if (isIncrementalDelta) {
+            tableConfig.filters = [...normalizeCoverageList(tableConfig.filters), `$AlterID > ${lastAlterIdTransactionDatabase}`];
+            this.runtimeCoverageFilters.set(tableConfig.name, normalizeCoverageList(tableConfig.filters));
+            await this.processReport('_voucherstate', tableConfig, substitutions);
+            await database.executeNonQuery('TRUNCATE TABLE _voucherstate');
+            const stagedCount = await database.bulkLoad(
+                path.join(process.cwd(), './csv/_voucherstate.data'),
+                '_voucherstate',
+                tableConfig.fields.map((field) => field.type),
+                tableConfig.fields.map((field) => field.name)
+            );
+            fs.unlinkSync(path.join(process.cwd(), './csv/_voucherstate.data'));
+            if (stagedCount > 0) {
+                await database.executeNonQuery('DELETE FROM trn_voucher_state WHERE guid IN (SELECT guid FROM _voucherstate)');
+                const rowCount = await database.executeNonQuery(
+                    `INSERT INTO trn_voucher_state
+                        (guid, voucher_key, alterid, date, voucher_type, _voucher_type, voucher_number, reference_number, reference_date, narration, party_name, _party_name, place_of_supply, is_invoice, is_accounting_voucher, is_inventory_voucher, is_order_voucher, is_optional, is_cancelled, source_sync_log_id, last_synced_at)
+                     SELECT
+                        guid,
+                        voucher_key,
+                        alterid,
+                        date,
+                        voucher_type,
+                        _voucher_type,
+                        voucher_number,
+                        reference_number,
+                        reference_date,
+                        narration,
+                        party_name,
+                        _party_name,
+                        place_of_supply,
+                        is_invoice,
+                        is_accounting_voucher,
+                        is_inventory_voucher,
+                        is_order_voucher,
+                        is_optional,
+                        is_cancelled,
+                        ${syncLogIdSql},
+                        now()
+                     FROM _voucherstate`
+                );
+                database.setTransactionRowCount(tableConfig.name, rowCount);
+                logger.logMessage('  synced table %s (%d changed rows)', tableConfig.name, rowCount);
+            } else {
+                database.setTransactionRowCount(tableConfig.name, 0);
+                logger.logMessage('  synced table %s (0 changed rows)', tableConfig.name);
+            }
+            await database.executeNonQuery('TRUNCATE TABLE _voucherstate');
+            return;
+        }
+
         this.runtimeCoverageFilters.set(tableConfig.name, normalizeCoverageList(tableConfig.filters));
         await this.processReport(tableConfig.name, tableConfig, substitutions);
         await database.executeNonQuery('TRUNCATE TABLE trn_voucher_state');
@@ -1067,7 +1141,6 @@ class _tally {
             tableConfig.fields.map((field) => field.name)
         );
         fs.unlinkSync(path.join(process.cwd(), `./csv/${tableConfig.name}.data`));
-        const syncLogIdSql = this.getCurrentSyncLogIdSql();
         await database.executeNonQuery(
             `UPDATE trn_voucher_state
              SET source_sync_log_id = ${syncLogIdSql},
